@@ -317,7 +317,7 @@ Le due espressioni di partenza sono *la stessa funzione* (ho solo cambiato il no
 
 == Alberi
 
-L'albero segue l'annidamento completo delle parentesi. Serve a vedere quali passi di valutazione si possono fare. Nodo $lambda$: figlio sinistro il parametro, destro il corpo. Nodo \@ (applicazione, nelle slide "o"): figli funzione e argomento.
+L'albero segue l'annidamento completo delle parentesi. Serve a vedere quali passi di valutazione si possono fare. Nodo $lambda$: figlio sinistro il parametro, destro il corpo. Nodo \@ (applicazione): figli funzione e argomento.
 
 #align(center, grid(columns: 3, gutter: 2.5em, align: bottom,
   [#albero(([$lambda$], [$x$], [$x$])) #align(center, text(9pt)[$lambda x. x$])],
