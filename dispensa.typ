@@ -82,7 +82,7 @@
   #text(14pt)[Diego Stefanini — prof.ssa Chiara Bodei, a.a. 2026-27]
 ]
 #v(1cm)
-#outline()
+#outline(depth: 2)
 
 = Il lambda calcolo
 
