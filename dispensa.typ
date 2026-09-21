@@ -84,7 +84,7 @@
 #v(1cm)
 #outline()
 
-= Il lambda calcolo #text(10pt, weight: "regular")[(21 set — slide _Lambda calcolo, prima parte_, tutte)]
+= Il lambda calcolo
 
 == Da dove viene: la calcolabilità
 
