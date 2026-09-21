@@ -2,6 +2,7 @@
 
 Workflow generale: `../CLAUDE.md`.
 
+- Repo GitHub: `DiegoStefanini/paradigmi-programmazione` (la cartella locale resta `programmazione/`).
 - Docente: Chiara Bodei, a.a. 2026-27. Pagina e-learning: elearning.di.unipi.it/enrol/index.php?id=1167 (dettagli del corso in `info.md`).
 - Lezioni: lunedì 9-11 aula E, martedì 16-18 aula D5, venerdì 14-16 aula D5. Registrate.
 - Niente libro: slide e dispense caricate man mano. Approccio "model-first": prima il modello formale, poi il linguaggio (OCaml soprattutto, poi Java, JavaScript, Python, C++).
