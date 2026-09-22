@@ -86,7 +86,7 @@
 
 = Il lambda calcolo
 
-== Da dove viene: la calcolabilità
+== Calcolabilità e paradigmi
 
 *Hilbert, Entscheidungsproblem* (problema della decisione): esiste una procedura *del tutto meccanica* che, data una qualunque formula della logica del primo ordine, dice se è un teorema?
 
@@ -96,7 +96,7 @@ Per rispondere bisogna prima dire cos'è una "procedura meccanica", cioè un *al
   ..(("Alonzo Church", "lambda calcolo", "1935"), ("Kurt Gödel, Stephen Kleene", "funzioni ricorsive", "1935"), ("Alan Turing", "macchina di Turing", "1936")).map(((chi, cosa, anno)) =>
     box(stroke: 0.6pt, inset: 8pt, width: 4.4cm, fill: rgb("#eef4ff"), radius: 4pt, align(center)[*#cosa* \ #text(9pt)[#chi, #anno]]))))
 
-=== La macchina di Turing
+Com'è fatta la *macchina di Turing*:
 
 #grid(columns: (1.3fr, 1fr), gutter: 1.5em, align: horizon,
 canvas(length: 0.7cm, {
@@ -120,7 +120,7 @@ canvas(length: 0.7cm, {
 
 Con la UTM Turing risponde *no* all'Entscheidungsproblem: esistono problemi che nessuna macchina di calcolo può risolvere.
 
-=== Tesi di Church-Turing
+I tre formalismi calcolano esattamente le stesse funzioni. Da qui la *tesi di Church-Turing*:
 
 #grid(columns: (1fr, 1fr), gutter: 1.5em, align: horizon,
 canvas(length: 0.8cm, {
@@ -141,9 +141,7 @@ canvas(length: 0.8cm, {
   Un linguaggio è *Turing completo* se calcola tutto ciò che calcola una macchina di Turing. Si dimostra scrivendo nel linguaggio un programma che *simula* una macchina di Turing.
 ])
 
-== Due famiglie di linguaggi
-
-=== Turing → von Neumann → linguaggi imperativi
+Dai due modelli, Turing e Church, nascono due famiglie di linguaggi. Da Turing vengono i linguaggi *imperativi*, passando per la macchina di von Neumann:
 
 #grid(columns: (auto, 1fr), gutter: 1.5em, align: horizon,
 canvas(length: 0.8cm, {
@@ -180,7 +178,7 @@ Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
   box(stroke: 0.6pt + red, inset: 8pt, width: 6.5cm)[*istruzioni* \ #text(9pt)[spazio disordinato, con poche proprietà utili. La programmazione strutturata prova a metterci un po' d'ordine]],
 ))
 
-=== Church → linguaggi funzionali
+Da Church vengono invece i linguaggi *funzionali*.
 
 *Programmazione funzionale*: il programma è una serie di *valutazioni di funzioni matematiche*. Punto di forza: niente *effetti collaterali*, quindi è più facile verificare che il programma sia corretto e ottimizzarlo. Il λ-calcolo (Church, 1935) è il primo linguaggio funzionale.
 
@@ -198,7 +196,9 @@ Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
   }
 }), [Le due linee di discendenza])
 
-== Astrazione funzionale
+== Sintassi dei λ-termini
+
+Il λ-calcolo ha solo due operazioni. La prima è l'*astrazione*, cioè definire una funzione:
 
 #align(center, canvas(length: 1cm, {
   import draw: *
@@ -214,9 +214,7 @@ Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
 
 Legge di corrispondenza: $forall x. f(x) = x$. È la *funzione identità*.
 
-== Applicazione
-
-Applicare una funzione = darle un *parametro attuale* al posto del parametro formale. Immagina la funzione come una scatola:
+La seconda è l'*applicazione*. Applicare una funzione = darle un *parametro attuale* al posto del parametro formale. Immagina la funzione come una scatola:
 
 #align(center, grid(columns: (auto, auto), gutter: 1.2em, align: (right + horizon, left + horizon),
   scatola($z$, $lambda x. x$, $z$), [*identità*: restituisce l'input così com'è],
@@ -228,9 +226,7 @@ La selezione passo per passo: $((lambda x. lambda y. x) z) w arrow.r (lambda y. 
 
 #nota[$lambda x. lambda y. x$ ha legge di corrispondenza $forall x. f(x) = g$ dove $g(y) = x$: una funzione che restituisce una funzione. È un modo alternativo di scrivere $f(x, y) = x$ con una funzione di un solo argomento.]
 
-== Sintassi
-
-Un programma è un'espressione (*λ-espressione*). Ci sono solo tre modi di costruirla:
+Queste due operazioni, più le variabili, sono tutto il linguaggio. Un programma è un'espressione (*λ-espressione*). Ci sono solo tre modi di costruirla:
 
 #align(center, box(stroke: 1pt + blu, inset: 12pt, radius: 4pt, grid(columns: 2, align: left, inset: 5pt,
   [$e ::= x$], [variabile],
@@ -239,9 +235,7 @@ Un programma è un'espressione (*λ-espressione*). Ci sono solo tre modi di cost
 )))
 #align(center, text(fill: red, weight: "bold")[Niente altro! La sintassi è finita.])
 
-=== $lambda x. e$ è una funzione anonima
-
-Non ha nome; $x$ è la dichiarazione del suo parametro. Lo stesso concetto nei linguaggi:
+$lambda x. e$ è una *funzione anonima*: non ha nome, e $x$ è la dichiarazione del suo parametro. Lo stesso concetto nei linguaggi:
 
 #align(center, table(columns: 2,
   [Linguaggio], [$x mapsto x + 1$],
@@ -252,7 +246,30 @@ Non ha nome; $x$ è la dichiarazione del suo parametro. Lo stesso concetto nei l
 
 In $e_1 e_2$ la funzione $e_1$ è applicata all'argomento $e_2$, come una chiamata in JavaScript: $e_1$ definisce la funzione, $e_2$ il parametro attuale. La definizione può stare *direttamente dentro* la chiamata: $underbrace((lambda x. (lambda y. x y)), e_1) underbrace((lambda z. z), e_2)$.
 
-== Esempi
+Per non scrivere troppe parentesi valgono due convenzioni (importanti):
+
+#grid(columns: 2, gutter: 1em,
+  box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
+    *1. Lo scope di $lambda$ va il più a destra possibile* \
+    $lambda x. lambda y. x y$ #h(0.3em) è #h(0.3em) $lambda x. (lambda y. (x y))$],
+  box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
+    *2. L'applicazione associa a sinistra* \
+    $e_1 e_2 e_3$ #h(0.3em) è #h(0.3em) $(e_1 e_2) e_3$],
+)
+
+*Esercizio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
++ lo scope di $lambda$ va il più a destra possibile: $lambda x. (x lambda y. (x y z))$
++ l'applicazione associa a sinistra: $lambda x. (x (lambda y. ((x y) z)))$
+
+Ogni termine si può disegnare come un *albero*, che segue l'annidamento completo delle parentesi. Serve a vedere quali passi di valutazione si possono fare. Nodo $lambda$: figlio sinistro il parametro, destro il corpo. Nodo \@ (applicazione): figli funzione e argomento.
+
+#align(center, grid(columns: 3, gutter: 2.5em, align: bottom,
+  [#albero(([$lambda$], [$x$], [$x$])) #align(center, text(9pt)[$lambda x. x$])],
+  [#albero(([\@], ([$lambda$], [$x$], [$x$]), [$y$])) #align(center, text(9pt)[$(lambda x. x) y arrow.r y$])],
+  [#albero(([$lambda$], [$x$], ([\@], [$x$], ([$lambda$], [$y$], ([\@], ([\@], [$x$], [$y$]), [$z$]))))) #align(center, text(9pt)[$lambda x. (x (lambda y. ((x y) z)))$])],
+))
+
+== Esempi di calcolo
 
 #table(columns: (auto, 1fr), align: (left, left),
   [Espressione], [Cosa fa],
@@ -274,9 +291,7 @@ In $e_1 e_2$ la funzione $e_1$ è applicata all'argomento $e_2$, come una chiama
 
 #nota[$(lambda y. 3 + y)$ è una funzione a sé: somma 3 a quello che le passi. Applicando una funzione di due argomenti a uno solo ottieni una funzione che aspetta l'altro.]
 
-=== Attenzione 1: quale redex scelgo?
-
-Un *redex* è un pezzo della forma $(lambda x. e) e'$, pronto per essere applicato. In $(lambda x. x)((lambda y. y) z)$ ce ne sono due:
+Spesso si può scegliere da che parte cominciare. Un *redex* è un pezzo della forma $(lambda x. e) e'$, pronto per essere applicato. In $(lambda x. x)((lambda y. y) z)$ ce ne sono due:
 
 #figura(canvas(length: 1cm, {
   import draw: *
@@ -290,49 +305,12 @@ Un *redex* è un pezzo della forma $(lambda x. e) e'$, pronto per essere applica
   line((2.5, -2.15), (0.4, -3.1), mark: (end: "stealth"))
 }), [Strade diverse, stesso risultato])
 
-=== Attenzione 2: conflitto di nomi
-
-#align(center, table(columns: 3, align: left,
-  [], [Espressione], [Risultato],
-  [ingenuo], [$(lambda x. lambda y. x y) y$], [$lambda y. y y$ #h(0.5em) #text(fill: red)[✗ sbagliato]],
-  [rinomino $y$ in $z$], [$(lambda x. lambda z. x z) y$], [$lambda z. y z$ #h(0.5em) #text(fill: verde)[✓]],
-))
-
-Le due espressioni di partenza sono *la stessa funzione* (ho solo cambiato il nome del parametro), ma i risultati si comportano in modo diverso. Nel primo caso la $y$ libera che passo come argomento finisce *catturata* dal $lambda y$ interno: è un *conflitto di nomi*.
-
-== Convenzioni sintattiche (importanti)
-
-#grid(columns: 2, gutter: 1em,
-  box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
-    *1. Lo scope di $lambda$ va il più a destra possibile* \
-    $lambda x. lambda y. x y$ #h(0.3em) è #h(0.3em) $lambda x. (lambda y. (x y))$],
-  box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
-    *2. L'applicazione associa a sinistra* \
-    $e_1 e_2 e_3$ #h(0.3em) è #h(0.3em) $(e_1 e_2) e_3$],
-)
-
-*Esercizio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
-+ lo scope di $lambda$ va il più a destra possibile: $lambda x. (x lambda y. (x y z))$
-+ l'applicazione associa a sinistra: $lambda x. (x (lambda y. ((x y) z)))$
-
-== Alberi
-
-L'albero segue l'annidamento completo delle parentesi. Serve a vedere quali passi di valutazione si possono fare. Nodo $lambda$: figlio sinistro il parametro, destro il corpo. Nodo \@ (applicazione): figli funzione e argomento.
-
-#align(center, grid(columns: 3, gutter: 2.5em, align: bottom,
-  [#albero(([$lambda$], [$x$], [$x$])) #align(center, text(9pt)[$lambda x. x$])],
-  [#albero(([\@], ([$lambda$], [$x$], [$x$]), [$y$])) #align(center, text(9pt)[$(lambda x. x) y arrow.r y$])],
-  [#albero(([$lambda$], [$x$], ([\@], [$x$], ([$lambda$], [$y$], ([\@], ([\@], [$x$], [$y$]), [$z$]))))) #align(center, text(9pt)[$lambda x. (x (lambda y. ((x y) z)))$])],
-))
-
 == Variabili libere e legate
 
 $lambda$ è un *operatore di binding*: in $lambda x. e$ lega la $x$ dentro $e$ (il suo *scope*), come $forall x$ in $forall x. P$ nella logica. È l'*unico* modo di associare valori a variabili nel λ-calcolo.
 
 - *Legata*: introdotta da un $lambda$ che la contiene. #text(fill: verde)[*verde*], la freccia punta al suo $lambda$.
 - *Libera*: nessun $lambda$ la dichiara. #text(fill: red)[*rossa*].
-
-$x$ in $lambda x. e$ è un segnaposto: si può rinominare con una variabile *fresca*, cioè un nome che non compare da nessuna parte nelle espressioni che stiamo trattando. È quello che risolve il conflitto di nomi.
 
 #align(center, table(columns: (auto, 1fr), align: (center + horizon, left + horizon), inset: 8pt,
   [Espressione], [Chi è legato],
@@ -342,8 +320,6 @@ $x$ in $lambda x. e$ è un segnaposto: si può rinominare con una variabile *fre
   legami(("(", "λ", "f", ".", "f", "x", ")", "f"), ((2, 4),), libere: (5, 7)), [la prima $f$ è legata; $x$ e *la seconda $f$ sono libere*: sta fuori dalle parentesi, fuori dallo scope di $lambda f$],
 ))
 
-=== Attenzione: scope annidati
-
 Una stessa variabile può voler dire cose diverse in punti diversi:
 
 #align(center, legami(("λ", "x", ".", "x", "(", "λ", "x", ".", "x", ")", "x"), ((1, 3), (6, 8), (1, 10))))
@@ -351,3 +327,15 @@ Una stessa variabile può voler dire cose diverse in punti diversi:
 #align(center)[che con le parentesi esplicite è $lambda x. (x (lambda x. x) x)$]
 
 La $x$ nel $lambda x$ interno è legata a *quel* $lambda$, non a quello esterno. Tre $x$, due significati: da qui nasce il conflitto di nomi.
+
+Ecco il problema che questo crea. Applicando senza fare attenzione ai nomi:
+
+#align(center, table(columns: 3, align: left,
+  [], [Espressione], [Risultato],
+  [ingenuo], [$(lambda x. lambda y. x y) y$], [$lambda y. y y$ #h(0.5em) #text(fill: red)[✗ sbagliato]],
+  [rinomino $y$ in $z$], [$(lambda x. lambda z. x z) y$], [$lambda z. y z$ #h(0.5em) #text(fill: verde)[✓]],
+))
+
+Le due espressioni di partenza sono *la stessa funzione* (ho solo cambiato il nome del parametro), ma i risultati si comportano in modo diverso. Nel primo caso la $y$ libera che passo come argomento finisce *catturata* dal $lambda y$ interno: è un *conflitto di nomi*.
+
+$x$ in $lambda x. e$ è un segnaposto: si può rinominare con una variabile *fresca*, cioè un nome che non compare da nessuna parte nelle espressioni che stiamo trattando. È così che si risolve il conflitto di nomi, come nella riga «rinomino» della tabella.
