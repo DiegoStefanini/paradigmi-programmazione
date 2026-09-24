@@ -88,7 +88,7 @@
 
 == Calcolabilità e paradigmi
 
-*Hilbert, Entscheidungsproblem* (problema della decisione): esiste una procedura *del tutto meccanica* che, data una qualunque formula della logica del primo ordine, dice se è un teorema?
+*Hilbert, Entscheidungsproblem* (problema della decisione): esiste una procedura *del tutto meccanica* che, data una qualunque formula della logica del primo ordine (un'affermazione matematica scritta in un linguaggio formale), dice se è un teorema, cioè se si può dimostrare?
 
 Per rispondere bisogna prima dire cos'è una "procedura meccanica", cioè un *algoritmo*. Tre risposte diverse, quasi insieme:
 
@@ -120,7 +120,7 @@ canvas(length: 0.7cm, {
 
 Con la UTM Turing risponde *no* all'Entscheidungsproblem: esistono problemi che nessuna macchina di calcolo può risolvere.
 
-I tre formalismi calcolano esattamente le stesse funzioni. Da qui la *tesi di Church-Turing*:
+I tre formalismi, anche se sono fatti in modo diversissimo, calcolano esattamente le stesse funzioni. Da qui la *tesi di Church-Turing*. Nella figura, i modelli meno potenti sono quelli che calcolano solo *funzioni totali* (danno sempre un risultato, per ogni input) e, ancora più dentro, le espressioni regolari:
 
 #grid(columns: (1fr, 1fr), gutter: 1.5em, align: horizon,
 canvas(length: 0.8cm, {
@@ -160,7 +160,7 @@ canvas(length: 0.8cm, {
   - *memoria* con programmi e dati;
   - *CPU* che preleva un'istruzione alla volta, la interpreta e la esegue.
 
-  La generalità viene dal *programma memorizzato*.
+  La generalità viene dal *programma memorizzato*: il programma sta in memoria come un dato qualsiasi, quindi la stessa macchina esegue qualunque programma basta caricarlo.
 ])
 
 Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
@@ -168,8 +168,8 @@ Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
 #align(center, table(columns: 3, align: (right, center, left),
   [Nel linguaggio], [], [Nella macchina],
   [variabili], [↔], [celle di memoria (il nastro)],
-  [istruzioni di controllo (if, cicli)], [↔], [test & jump],
-  [assegnamento], [↔], [modifica dello stato (fetch & store)],
+  [istruzioni di controllo (if, cicli)], [↔], [test & jump (controllo una condizione e salto)],
+  [assegnamento], [↔], [modifica dello stato (leggo e scrivo la memoria)],
 ))
 
 *Backus*: l'assegnamento divide la programmazione in due mondi.
@@ -180,7 +180,7 @@ Un linguaggio "alla von Neumann" riproduce ad alto livello questa struttura:
 
 Da Church vengono invece i linguaggi *funzionali*.
 
-*Programmazione funzionale*: il programma è una serie di *valutazioni di funzioni matematiche*. Punto di forza: niente *effetti collaterali*, quindi è più facile verificare che il programma sia corretto e ottimizzarlo. Il λ-calcolo (Church, 1935) è il primo linguaggio funzionale.
+*Programmazione funzionale*: il programma è una serie di *valutazioni di funzioni matematiche*. Punto di forza: niente *effetti collaterali*. Una funzione ha un effetto collaterale quando, oltre a restituire un valore, cambia qualcosa fuori da sé (una variabile globale, un file, lo schermo). Senza effetti collaterali una funzione con lo stesso input dà sempre lo stesso output, quindi è più facile verificare che il programma sia corretto e ottimizzarlo. Il λ-calcolo (Church, 1935) è il primo linguaggio funzionale.
 
 #figura(canvas(length: 0.5cm, {
   import draw: *
@@ -212,7 +212,7 @@ Il λ-calcolo ha solo due operazioni. La prima è l'*astrazione*, cioè definire
   line((1.9, 0.55), (3.2, 1.4), mark: (start: "stealth")); content((4.6, 1.8), text(9pt, fill: verde)[corpo: calcolato sull'input dà l'output])
 }))
 
-Legge di corrispondenza: $forall x. f(x) = x$. È la *funzione identità*.
+La *legge di corrispondenza* dice cosa fa la funzione su ogni input: qui $forall x. f(x) = x$, cioè a ogni $x$ associa $x$ stesso. È la *funzione identità*.
 
 La seconda è l'*applicazione*. Applicare una funzione = darle un *parametro attuale* al posto del parametro formale. Immagina la funzione come una scatola:
 
@@ -222,7 +222,7 @@ La seconda è l'*applicazione*. Applicare una funzione = darle un *parametro att
   scatola($z, w$, $lambda x. lambda y. x$, $z$), [*selezione*: prende due argomenti e restituisce il primo],
 ))
 
-La selezione passo per passo: $((lambda x. lambda y. x) z) w arrow.r (lambda y. z) w arrow.r z$.
+La selezione passo per passo: $((lambda x. lambda y. x) z) w arrow.r (lambda y. z) w arrow.r z$. Nel primo passo metto $z$ al posto di $x$ nel corpo $lambda y. x$; nel secondo metto $w$ al posto di $y$ nel corpo $z$, ma $y$ non c'è, quindi $w$ sparisce e resta $z$.
 
 #nota[$lambda x. lambda y. x$ ha legge di corrispondenza $forall x. f(x) = g$ dove $g(y) = x$: una funzione che restituisce una funzione. È un modo alternativo di scrivere $f(x, y) = x$ con una funzione di un solo argomento.]
 
@@ -235,31 +235,42 @@ Queste due operazioni, più le variabili, sono tutto il linguaggio. Un programma
 )))
 #align(center, text(fill: red, weight: "bold")[Niente altro! La sintassi è finita.])
 
+Si legge: un'espressione $e$ è una variabile, *oppure* ($|$) un'astrazione, *oppure* un'applicazione. La definizione è *ricorsiva*: dentro $lambda x. e$ e dentro $e space e$ ci sono altre espressioni, costruite con le stesse tre regole. Per esempio $(lambda x. x) y$ è un'applicazione di $lambda x. x$ (astrazione, con corpo la variabile $x$) alla variabile $y$.
+
 $lambda x. e$ è una *funzione anonima*: non ha nome, e $x$ è la dichiarazione del suo parametro. Lo stesso concetto nei linguaggi:
 
-#align(center, table(columns: 2,
+#align(center, block(breakable: false, table(columns: 2,
   [Linguaggio], [$x mapsto x + 1$],
   [JavaScript], [`function(a){ return a + 1; }` oppure `a => a+1`],
   [OCaml], [`fun x -> x+1`],
   [Java (si chiamano lambda)], [`(int x) -> x + 1`],
-))
+)))
 
-In $e_1 e_2$ la funzione $e_1$ è applicata all'argomento $e_2$, come una chiamata in JavaScript: $e_1$ definisce la funzione, $e_2$ il parametro attuale. La definizione può stare *direttamente dentro* la chiamata: $underbrace((lambda x. (lambda y. x y)), e_1) underbrace((lambda z. z), e_2)$.
+Da qui in poi useremo lettere come $e$, $e_1$, $e_2$, $e_3$. *Non* sono variabili del λ-calcolo: sono nomi che stanno per *un'espressione qualsiasi*, come in algebra $a + b$ vale per due numeri qualsiasi. Così una regola scritta con $e_1$ ed $e_2$ vale per tutte le espressioni.
 
-Per non scrivere troppe parentesi valgono due convenzioni (importanti):
+Per esempio $e_1 e_2$ vuol dire "un'espressione seguita da un'altra", cioè un'*applicazione*: $e_1$ è la funzione che chiamo, $e_2$ è l'argomento che le passo (il parametro attuale). In JavaScript si scriverebbe `e1(e2)`. La funzione non deve per forza avere un nome: la sua definizione può stare *direttamente dentro* la chiamata.
+
+$ underbrace((lambda x. (lambda y. x y)), e_1 = "la funzione") space underbrace((lambda z. z), e_2 = "l'argomento") $
+
+Se si scrive tutto senza parentesi, però, non si capisce cosa va con cosa. $lambda x. x y$ è la funzione $lambda x. (x y)$ (prende $x$ e restituisce $x$ applicata a $y$) oppure $(lambda x. x) y$ (l'identità applicata a $y$)? Per decidere, e per non scrivere troppe parentesi, valgono due convenzioni (importanti):
 
 #grid(columns: 2, gutter: 1em,
   box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
     *1. Lo scope di $lambda$ va il più a destra possibile* \
+    Il corpo di una $lambda$ è *tutto* quello che c'è dopo il punto, fino alla fine (o fino a una parentesi chiusa). \
+    $lambda x. x y$ #h(0.3em) è #h(0.3em) $lambda x. (x y)$ \
     $lambda x. lambda y. x y$ #h(0.3em) è #h(0.3em) $lambda x. (lambda y. (x y))$],
   box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
     *2. L'applicazione associa a sinistra* \
+    Con più applicazioni di fila si parte da sinistra: prima $e_1$ applicata a $e_2$, poi il risultato applicato a $e_3$. Come `f(a)(b)` in JavaScript. \
     $e_1 e_2 e_3$ #h(0.3em) è #h(0.3em) $(e_1 e_2) e_3$],
 )
 
+La selezione vista sopra ne è un esempio: $(lambda x. lambda y. x) z w$ è $((lambda x. lambda y. x) z) w$, cioè prima passo $z$, poi $w$.
+
 *Esercizio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
-+ lo scope di $lambda$ va il più a destra possibile: $lambda x. (x lambda y. (x y z))$
-+ l'applicazione associa a sinistra: $lambda x. (x (lambda y. ((x y) z)))$
++ Regola 1. Il corpo di $lambda x$ è tutto il resto, $x lambda y. x y z$; dentro, il corpo di $lambda y$ è $x y z$: #h(0.3em) $lambda x. (x lambda y. (x y z))$
++ Regola 2. $x y z$ diventa $(x y) z$; e $x lambda y. dots$ è $x$ applicata alla funzione $lambda y. dots$: #h(0.3em) $lambda x. (x (lambda y. ((x y) z)))$
 
 Ogni termine si può disegnare come un *albero*, che segue l'annidamento completo delle parentesi. Serve a vedere quali passi di valutazione si possono fare. Nodo $lambda$: figlio sinistro il parametro, destro il corpo. Nodo \@ (applicazione): figli funzione e argomento.
 
@@ -269,29 +280,195 @@ Ogni termine si può disegnare come un *albero*, che segue l'annidamento complet
   [#albero(([$lambda$], [$x$], ([\@], [$x$], ([$lambda$], [$y$], ([\@], ([\@], [$x$], [$y$]), [$z$]))))) #align(center, text(9pt)[$lambda x. (x (lambda y. ((x y) z)))$])],
 ))
 
-== Esempi di calcolo
+== Variabili libere e legate
 
-#table(columns: (auto, 1fr), align: (left, left),
+$lambda$ è un *operatore di binding*: in $lambda x. e$ lega la $x$ dentro $e$ (il suo *scope*), come $forall x$ in $forall x. P$ nella logica. È l'*unico* modo di associare valori a variabili nel λ-calcolo.
+
+- *Legata*: introdotta da un $lambda$ che la contiene. #text(fill: verde)[*verde*], la freccia punta al suo $lambda$.
+- *Libera*: nessun $lambda$ la dichiara. #text(fill: red)[*rossa*].
+
+#align(center, block(breakable: false, table(columns: (auto, 1fr), align: (center + horizon, left + horizon), inset: 8pt,
+  [Espressione], [Chi è legato],
+  legami(("λ", "x", ".", "x"), ((1, 3),)), [$x$ legata],
+  legami(("λ", "x", ".", "λ", "y", ".", "(", "x", "y", "z", ")"), ((1, 7), (4, 8)), libere: (9,)), [$x$ e $y$ legate, $z$ libera],
+  legami(("(", "λ", "f", ".", "f", "x", ")", "y"), ((2, 4),), libere: (5, 7)), [$f$ legata, $x$ e $y$ libere],
+  legami(("(", "λ", "f", ".", "f", "x", ")", "f"), ((2, 4),), libere: (5, 7)), [la prima $f$ è legata; $x$ e *la seconda $f$ sono libere*: sta fuori dalle parentesi, fuori dallo scope di $lambda f$],
+)))
+
+Una stessa variabile può voler dire cose diverse in punti diversi:
+
+#align(center, legami(("λ", "x", ".", "x", "(", "λ", "x", ".", "x", ")", "x"), ((1, 3), (6, 8), (1, 10))))
+
+#align(center)[che con le parentesi esplicite è $lambda x. (x (lambda x. x) x)$]
+
+La $x$ nel $lambda x$ interno è legata a *quel* $lambda$, non a quello esterno. Tre $x$, due significati: da qui nasce il conflitto di nomi.
+
+Ecco il problema che questo crea. Applicando senza fare attenzione ai nomi:
+
+#align(center, block(breakable: false, table(columns: 3, align: left,
+  [], [Espressione], [Risultato],
+  [ingenuo], [$(lambda x. lambda y. x y) y$], [$lambda y. y y$ #h(0.5em) #text(fill: red)[✗ sbagliato]],
+  [rinomino $y$ in $z$], [$(lambda x. lambda z. x z) y$], [$lambda z. y z$ #h(0.5em) #text(fill: verde)[✓]],
+)))
+
+Le due espressioni di partenza sono *la stessa funzione* (ho solo cambiato il nome del parametro), ma i risultati si comportano in modo diverso. Nel primo caso la $y$ libera che passo come argomento finisce *catturata* dal $lambda y$ interno: è un *conflitto di nomi*.
+
+$x$ in $lambda x. e$ è un segnaposto: si può rinominare con una variabile *fresca*, cioè un nome che non compare da nessuna parte nelle espressioni che stiamo trattando. È così che si risolve il conflitto di nomi, come nella riga «rinomino» della tabella.
+
+Le variabili libere si possono definire in modo preciso, con una *definizione induttiva*: un caso per ogni elemento della sintassi.
+
+#align(center, box(stroke: 1pt + verde, inset: 12pt, radius: 4pt, grid(columns: 2, align: left, column-gutter: 2em, row-gutter: 0.7em,
+  [$"FV"(x) = {x}$], text(9pt)[variabile],
+  [$"FV"(e_1 e_2) = "FV"(e_1) union "FV"(e_2)$], text(9pt)[applicazione: le libere di tutte e due],
+  [$"FV"(lambda x. e) = "FV"(e) without {x}$], text(9pt)[astrazione: il $lambda$ lega $x$, la tolgo],
+)))
+
+FV sta per _Free Variables_. Una variabile che non è libera è *legata* (_bound_). Un termine senza variabili libere ($"FV"(e) = emptyset$) si dice *chiuso*; i termini chiusi si chiamano *combinatori*, il più semplice è l'identità $lambda x. x$.
+
+*Esercizio*: $"FV"((lambda x. lambda y. x y)((lambda z. z) k))$
+$ = "FV"(lambda x. lambda y. x y) union "FV"((lambda z. z) k) = emptyset union {k} = {k} $
+
+Visto che un parametro è solo un segnaposto, cambiargli nome non cambia niente. $lambda a. a c$ e $lambda b. b c$ si dicono *α-equivalenti*: $a$ e $b$ non hanno un significato proprio, conta solo il *ruolo* che hanno nell'espressione. Lo stesso vale nei linguaggi:
+
+#align(center, grid(columns: 3, gutter: 1.5em, align: horizon,
+  `function(a){ return a + 1; }`, [è α-equivalente a], `function(b){ return b + 1; }`,
+))
+
+Espressioni α-equivalenti rappresentano *lo stesso programma*. Rinominare una variabile legata con una variabile fresca (che non compare nell'espressione) si chiama *α-conversione*. Serve a passare da $lambda x. x$ a $lambda z. z$, e soprattutto a togliere il conflitto di nomi visto sopra (_variable shadowing_):
+
+#align(center, grid(columns: 3, gutter: 1.5em, align: horizon,
+  legami(("λ", "x", ".", "x", "(", "λ", "x", ".", "x", ")", "x"), ((1, 3), (6, 8), (1, 10))),
+  [$attach(arrow.r, t: alpha)$],
+  legami(("λ", "x", ".", "x", "(", "λ", "z", ".", "z", ")", "x"), ((1, 3), (6, 8), (1, 10))),
+))
+#align(center, text(9pt)[i due termini sono equivalenti a meno di α-conversione, ma nel secondo ogni nome ha un solo significato])
+
+== Sostituzione e β-riduzione
+
+Cosa vuol dire *eseguire* (valutare) una λ-espressione? La valutazione, _eval_, fa solo una cosa: *chiamare funzioni*.
+
+#align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt)[
+  $"eval"((lambda x. e_1) e_2)$: #h(0.5em) rimpiazzo ogni occorrenza di $x$ in $e_1$ con $e_2$, poi valuto il termine che ne risulta.
+])
+
+È la chiamata di una funzione: eseguo il corpo $e_1$ dopo aver messo il *parametro attuale* $e_2$ al posto del *parametro formale* $x$.
+
+La *sostituzione* si scrive $e_1 {x := e_2}$ (oppure $e_1 {e_2 slash x}$): è $e_1$ con ogni occorrenza *libera* di $x$ sostituita da $e_2$. Per esempio $x z {x := lambda y. y} = (lambda y. y) z$.
+
+Il problema: e se $e_2$ contiene una variabile libera che in $e_1$ è legata? Sostituendo alla cieca finisce *catturata* dal $lambda$ di $e_1$, e legare una variabile libera cambia il significato. Esempio con le operazioni aritmetiche, per semplicità: $(lambda x. (x * y)) {y := (x + x)}$.
+
+#align(center, table(columns: 2, align: left,
+  [Come], [Risultato],
+  [alla cieca], [$lambda x. (x * (x + x))$ #h(0.5em) #text(fill: red)[✗ le $x$ di $x + x$ ora sono il parametro]],
+  [α-conversione, $z$ fresca], [$(lambda z. (z * y)) {y := (x + x)} = lambda z. (z * (x + x))$ #h(0.5em) #text(fill: verde)[✓]],
+))
+
+La soluzione è la *sostituzione che evita la cattura* (_capture-avoiding substitution_): prima di sostituire, se serve, rinomino con l'α-conversione. La definizione ha un caso per ogni elemento della sintassi:
+
+#block(breakable: false, table(columns: (auto, auto, 1fr), align: (left, left, left), inset: 7pt,
+  [], [Regola], [Perché],
+  table.cell(rowspan: 2, fill: rgb("#eef4ff"))[variabile], [$x {x := e} equiv e$], [è proprio la variabile da sostituire],
+  [$y {x := e} equiv y$ #h(0.5em) se $x != y$], [un'altra variabile non si tocca],
+  table.cell(fill: rgb("#eef4ff"))[applicazione], [$(e_1 e_2){x := e} equiv (e_1 {x := e})(e_2 {x := e})$], [sostituisco da tutte e due le parti],
+  table.cell(rowspan: 3, fill: rgb("#eef4ff"))[astrazione], [$(lambda x. e_1){x := e} equiv lambda x. e_1$], [qui $x$ è legata: la sostituzione vale solo per le variabili libere, quindi non cambia niente],
+  [$(lambda y. e_1){x := e} equiv lambda y. (e_1 {x := e})$ \ se $y != x$ e $y in.not "FV"(e)$], [in $e$ non compare $y$: nessun rischio di conflitto],
+  [$(lambda y. e_1){x := e} equiv lambda z. ((e_1 {y := z}){x := e})$ \ se $y != x$ e $y in "FV"(e)$, $z$ fresca], [la $y$ libera di $e$ verrebbe catturata: prima α-converto $y$ in $z$, poi sostituisco],
+))
+
+#block(sticky: true)["Fresca" qui vuol dire che non compare né in $e_1$ né in $e$. L'ultimo caso, disegnato: sostituire $x$ con $y$ nel corpo di $lambda x. lambda y. x y$.]
+
+#align(center, grid(columns: 2, gutter: 4em, align: center + bottom,
+  [#legami(("λ", "y", ".", "y", "y"), ((1, 3), (1, 4))) \ #text(9pt)[alla cieca: la $y$ arriva in un mondo dove esiste \ già una $y$ legata e diventa indistinguibile da lei #text(fill: red)[✗]]],
+  [#legami(("λ", "z", ".", "y", "z"), ((1, 4),), libere: (3,)) \ #text(9pt)[prima rinomino $y$ in $z$: \ ora la $y$ resta libera #text(fill: verde)[✓]]],
+))
+
+Un esempio completo: $(lambda x. lambda y. ((lambda z. z) x)) y$. Il passo $(lambda y. ((lambda z. z) x)){x := y}$ fatto alla cieca *non va bene*: le due $y$ sono diverse ($y in "FV"(e)$). Quindi, con $k$ fresca:
+
+$ (lambda y. ((lambda z. z) x)){x := y} = (lambda k. ((lambda z. z) x)){x := y} = lambda k. ((lambda z. z) y) $
+
+*Esercizi*. L'espressione è sempre la stessa, cambia la variabile da sostituire ($attach(equiv, br: alpha)$ vuol dire "α-equivalente", cioè uguale a meno di rinominare):
+
+#table(columns: (auto, 1fr), align: left,
+  [Sostituzione], [Risultato],
+  [$((lambda x. y x) w){x := lambda k. k x}$], [$(lambda x. y x) w$ #h(0.5em) #text(9pt)[l'unica $x$ è legata: $(lambda x. e_1){x := e} equiv lambda x. e_1$]],
+  [$((lambda x. y x) w){y := lambda k. k x}$], [$attach(equiv, br: alpha) ((lambda z. y z) w){y := lambda k. k x} = (lambda z. (lambda k. k x) z) w$ \ #text(9pt)[la $x$ di $lambda k. k x$ è libera e verrebbe catturata da $lambda x$: rinomino]],
+  [$((lambda x. y x) w){w := lambda k. k x}$], [$(lambda x. y x)(lambda k. k x)$ #h(0.5em) #text(9pt)[$w$ non è sotto nessun $lambda$: caso applicazione]],
+)
+
+Con la sostituzione si scrive la regola fondamentale del λ-calcolo, quella che lo rende un modello di calcolo universale, la *β-riduzione*:
+
+#align(center, box(stroke: 1.5pt + red, inset: 12pt, radius: 4pt, text(14pt)[$(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$]))
+
+- Cattura esattamente l'*applicazione di funzione*: $(lambda x. x) 3 arrow.r 3$.
+- Il risultato è il corpo $e_1$ in cui il parametro formale $x$ è sostituito da copie dell'argomento $e_2$.
+- Un *redex* (espressione riducibile) è una sottoespressione della forma $(lambda x. e_1) e_2$, a cui la regola si può applicare.
+
+Esempio: $(lambda x. lambda z. x z) y$. Il parametro formale è $x$, il corpo è $e_1 = lambda z. x z$, il parametro attuale è $e_2 = y$:
+
+#align(center, grid(columns: 3, gutter: 2em, align: horizon,
+  albero(([\@], ([$lambda$], [$x$], ([$lambda$], [$z$], ([\@], [$x$], [$z$]))), [$y$])),
+  [$arrow.r$ \ #text(9pt)[$e_1 {x := y}$]],
+  albero(([$lambda$], [$z$], ([\@], [$y$], [$z$]))),
+))
+#align(center)[$(lambda x. lambda z. x z) y arrow.r lambda z. y z$]
+
+Il λ-calcolo è di *ordine superiore*: una funzione può prendere funzioni come parametri e restituire funzioni come risultato, in modo naturale.
+
+#block(breakable: false, width: 100%, table(columns: (auto, 1fr), align: (left, left),
   [Espressione], [Cosa fa],
   [$lambda x. x$], [identità],
   [$lambda y. (lambda x. x)$], [scarta l'argomento $y$ e restituisce l'identità: è una *funzione costante*],
   [$lambda f. f (lambda x. x)$], [data una funzione $f$, la *invoca sull'identità*],
-)
+))
 
-#table(columns: (auto, 1fr), align: (left, left),
+#block(breakable: false, width: 100%, table(columns: (auto, 1fr), align: (left, left),
   [Applicazione], [Passi],
   [$(lambda x. x) y$], [$arrow.r y$],
+  [$(lambda x. x) (lambda y. y)$], [$arrow.r lambda y. y$ #h(1em) #text(9pt)[l'identità applicata all'identità]],
+  [$(lambda x. x y) z$], [$arrow.r z y$ #h(1em) #text(9pt)[prende una funzione $z$ e la applica a $y$]],
+  [$(lambda x. x y)(lambda z. z)$], [$arrow.r (lambda z. z) y arrow.r y$ #h(1em) #text(9pt)[il parametro attuale è l'identità]],
   [$(lambda x. ((lambda y. y) x)) z$], [$arrow.r (lambda y. y) z arrow.r z$],
   [$(lambda f. f z)(lambda x. x)$], [$arrow.r (lambda x. x) z arrow.r z$ #h(1em) #text(9pt)[prende una funzione e la applica a $z$]],
   [$(lambda x. (x x))(lambda y. y)$], [$arrow.r (lambda y. y)(lambda y. y) arrow.r lambda y. y$ #h(1em) #text(9pt)[due termini uguali con ruoli diversi: funzione e argomento]],
   [$((lambda x. lambda y. x + y) 3) 5$], [$arrow.r (lambda y. 3 + y) 5 arrow.r 3 + 5 arrow.r 8$ #h(1em) #text(9pt)[(supponendo di avere il +)]],
   [$((lambda x. lambda y. x y)(lambda x. x)) z$], [$arrow.r (lambda y. (lambda x. x) y) z arrow.r (lambda x. x) z arrow.r z$ #h(1em) #text(9pt)[forma $e_1 e_2 e_3$]],
   [$(lambda x. lambda y. x y) z k$], [$arrow.r (lambda y. z y) k arrow.r z k$],
-)
+))
 
 #nota[$(lambda y. 3 + y)$ è una funzione a sé: somma 3 a quello che le passi. Applicando una funzione di due argomenti a uno solo ottieni una funzione che aspetta l'altro.]
 
-Spesso si può scegliere da che parte cominciare. Un *redex* è un pezzo della forma $(lambda x. e) e'$, pronto per essere applicato. In $(lambda x. x)((lambda y. y) z)$ ce ne sono due:
+La valutazione va avanti scegliendo un redex e riducendolo. Quando non ci sono più redex l'espressione è in *forma normale β*: non si può più riscrivere con la β-riduzione, ed è il *risultato finale*, il *valore calcolato*. Per esempio $lambda x. x$ e $lambda t. lambda f. t$ sono valori: *le funzioni sono valori*.
+
+#align(center, table(columns: 2, align: left,
+  [Notazione], [Significato],
+  [$e_1 arrow.r e_2$], [$e_2$ si ottiene da $e_1$ con *un* passo di riduzione],
+  [$e_1 arrow.r.double e_2$], [$e_2$ si ottiene da $e_1$ con *zero o più* passi],
+))
+
+Un passo di β-riduzione è un passo di calcolo, quindi $arrow.r.double$ (la *chiusura riflessiva e transitiva* di $arrow.r$) rappresenta una computazione qualsiasi. Quando $e_1 arrow.r.double e_2$ si dice che $e_1$ è *β-riducibile* a $e_2$.
+
+Con $arrow.r.double$ si definisce quando due espressioni sono "uguali". $e_1$ ed $e_2$ sono *β-equivalenti*, $e_1 attach(equiv, br: beta) e_2$, se:
++ sono identiche a meno di α-conversione, oppure
++ $e_1 arrow.r.double e_2$ oppure $e_2 arrow.r.double e_1$, oppure
++ $e_1 arrow.r.double e$ e anche $e_2 arrow.r.double e$ (arrivano alla stessa espressione).
+
+#align(center, canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), [$(lambda x. x) z$]); content((6, 0), [$(lambda x. lambda y. x) z w$])
+  content((6, -1.2), [$(lambda y. z) w$])
+  content((3, -2.4), box(stroke: 1pt + verde, inset: 5pt)[$z$])
+  line((0.3, -0.3), (2.6, -2.1), mark: (end: "stealth"))
+  line((6, -0.3), (6, -0.9), mark: (end: "stealth"))
+  line((5.7, -1.5), (3.4, -2.2), mark: (end: "stealth"))
+  content((3, 0), text(fill: verde)[$attach(equiv, br: beta)$])
+}))
+#align(center, text(9pt)[β-equivalenti per il terzo caso: tutte e due si riducono a $z$])
+
+*Intuizione*: due espressioni sono β-equivalenti quando sono indistinguibili dal punto di vista del calcolo, cioè calcolano gli stessi risultati.
+
+== Confluenza e non terminazione
+
+Quando un'espressione contiene più redex, si può scegliere da quale cominciare. In $(lambda x. x)((lambda y. y) z)$ ce ne sono due:
 
 #figura(canvas(length: 1cm, {
   import draw: *
@@ -305,37 +482,66 @@ Spesso si può scegliere da che parte cominciare. Un *redex* è un pezzo della f
   line((2.5, -2.15), (0.4, -3.1), mark: (end: "stealth"))
 }), [Strade diverse, stesso risultato])
 
-== Variabili libere e legate
+Ma in generale l'ordine di valutazione può cambiare il risultato finale? Un altro esempio (usando il $+$):
 
-$lambda$ è un *operatore di binding*: in $lambda x. e$ lega la $x$ dentro $e$ (il suo *scope*), come $forall x$ in $forall x. P$ nella logica. È l'*unico* modo di associare valori a variabili nel λ-calcolo.
+#figura(canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), box(stroke: 0.6pt, inset: 6pt)[$(lambda x. x + x)((lambda y. y) 5)$])
+  content((-3.3, -1.8), box(stroke: 0.6pt, inset: 6pt)[$(lambda y. y) 5 + (lambda y. y) 5$])
+  content((3.3, -1.8), box(stroke: 0.6pt, inset: 6pt)[$(lambda x. x + x) 5$])
+  content((0, -3.3), box(stroke: 0.6pt, inset: 6pt)[$5 + 5$])
+  content((0, -4.6), box(stroke: 1pt + verde, inset: 6pt)[$10$])
+  line((-0.8, -0.35), (-2.6, -1.45), mark: (end: "stealth")); content((-2.6, -0.6), text(8pt)[redex esterno])
+  line((0.8, -0.35), (2.6, -1.45), mark: (end: "stealth")); content((2.6, -0.6), text(8pt)[redex interno])
+  line((-2.8, -2.15), (-0.5, -3), mark: (end: "stealth")); content((-2.4, -2.8), text(8pt)[due passi])
+  line((2.8, -2.15), (0.5, -3), mark: (end: "stealth"))
+  line((0, -3.65), (0, -4.25), mark: (end: "stealth"))
+}), [Scegliendo prima il redex esterno si copia $(lambda y. y) 5$ e lo si riduce due volte; prima quello interno, una volta sola. Il risultato è lo stesso])
 
-- *Legata*: introdotta da un $lambda$ che la contiene. #text(fill: verde)[*verde*], la freccia punta al suo $lambda$.
-- *Libera*: nessun $lambda$ la dichiara. #text(fill: red)[*rossa*].
+La risposta generale è il *teorema di Church-Rosser*: l'ordine in cui si scelgono le β-riduzioni *non influisce sul risultato finale*. Più precisamente: se a una stessa espressione si possono applicare due riduzioni (o sequenze di riduzioni) diverse, esiste un'espressione raggiungibile da entrambi i risultati con altre riduzioni (anche nessuna).
 
-#align(center, table(columns: (auto, 1fr), align: (center + horizon, left + horizon), inset: 8pt,
-  [Espressione], [Chi è legato],
-  legami(("λ", "x", ".", "x"), ((1, 3),)), [$x$ legata],
-  legami(("λ", "x", ".", "λ", "y", ".", "(", "x", "y", "z", ")"), ((1, 7), (4, 8)), libere: (9,)), [$x$ e $y$ legate, $z$ libera],
-  legami(("(", "λ", "f", ".", "f", "x", ")", "y"), ((2, 4),), libere: (5, 7)), [$f$ legata, $x$ e $y$ libere],
-  legami(("(", "λ", "f", ".", "f", "x", ")", "f"), ((2, 4),), libere: (5, 7)), [la prima $f$ è legata; $x$ e *la seconda $f$ sono libere*: sta fuori dalle parentesi, fuori dallo scope di $lambda f$],
-))
+#grid(columns: (auto, 1fr), gutter: 2em, align: horizon,
+figura(canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), [$e$]); content((-1.3, -1.3), [$e_1$]); content((1.3, -1.3), [$e_2$]); content((0, -2.6), [$e'$])
+  line((-0.2, -0.2), (-1.1, -1.1), stroke: 1.2pt + blu, mark: (end: "stealth"))
+  line((0.2, -0.2), (1.1, -1.1), stroke: 1.2pt + blu, mark: (end: "stealth"))
+  line((-1.1, -1.5), (-0.2, -2.4), stroke: (paint: red, dash: "dashed", thickness: 1.2pt), mark: (end: "stealth"))
+  line((1.1, -1.5), (0.2, -2.4), stroke: (paint: red, dash: "dashed", thickness: 1.2pt), mark: (end: "stealth"))
+}), [Proprietà di confluenza \ (o del diamante)]),
+[Come due strade diverse fra le vie di una città che partono dallo stesso punto $e$: qualunque giro si faccia, ci si può sempre ritrovare nello stesso punto $e'$.
 
-Una stessa variabile può voler dire cose diverse in punti diversi:
+Per questo nell'esempio sopra entrambe le strade arrivano a $10$.])
 
-#align(center, legami(("λ", "x", ".", "x", "(", "λ", "x", ".", "x", ")", "x"), ((1, 3), (6, 8), (1, 10))))
+Non sempre però si arriva a una forma normale. Il combinatore
 
-#align(center)[che con le parentesi esplicite è $lambda x. (x (lambda x. x) x)$]
+$ Omega = (lambda x. x x)(lambda x. x x) $
 
-La $x$ nel $lambda x$ interno è legata a *quel* $lambda$, non a quello esterno. Tre $x$, due significati: da qui nasce il conflitto di nomi.
+contiene un solo redex, e ridurlo dà di nuovo $Omega$: la funzione $lambda x. x x$ applica il suo argomento a se stesso, e l'argomento è proprio $lambda x. x x$.
 
-Ecco il problema che questo crea. Applicando senza fare attenzione ai nomi:
+#align(center, canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), [$(lambda x. x x)(lambda x. x x)$])
+  line((1.9, 0), (3, 0), mark: (end: "stealth")); content((2.45, 0.3), text(8pt)[$beta$])
+  content((4.9, 0), [$(lambda x. x x)(lambda x. x x)$])
+  line((6.8, 0), (7.9, 0), mark: (end: "stealth")); content((8.4, 0), [$dots.c$])
+  bezier((4.9, -0.35), (0, -0.35), (2.45, -1.4), stroke: (paint: red, dash: "dashed"), mark: (end: "stealth"))
+  content((2.45, -1.2), text(9pt, fill: red)[*loop!* è di nuovo $Omega$])
+}))
 
-#align(center, table(columns: 3, align: left,
-  [], [Espressione], [Risultato],
-  [ingenuo], [$(lambda x. lambda y. x y) y$], [$lambda y. y y$ #h(0.5em) #text(fill: red)[✗ sbagliato]],
-  [rinomino $y$ in $z$], [$(lambda x. lambda z. x z) y$], [$lambda z. y z$ #h(0.5em) #text(fill: verde)[✓]],
-))
+$Omega$ non si può ridurre in forma normale: è un combinatore *divergente*, l'equivalente di un ciclo infinito.
 
-Le due espressioni di partenza sono *la stessa funzione* (ho solo cambiato il nome del parametro), ma i risultati si comportano in modo diverso. Nel primo caso la $y$ libera che passo come argomento finisce *catturata* dal $lambda y$ interno: è un *conflitto di nomi*.
+Una stessa espressione può *terminare* facendo certe scelte di riduzione e *non terminare* facendone altre. Per esempio $(lambda x. y) Omega$:
 
-$x$ in $lambda x. e$ è un segnaposto: si può rinominare con una variabile *fresca*, cioè un nome che non compare da nessuna parte nelle espressioni che stiamo trattando. È così che si risolve il conflitto di nomi, come nella riga «rinomino» della tabella.
+#figura(canvas(length: 1cm, {
+  import draw: *
+  for k in range(4) {
+    content((k * 2.6, 0), [$(lambda x. y) Omega$])
+    line((k * 2.6 + 0.8, 0), (k * 2.6 + 1.7, 0), mark: (end: "stealth"))
+    line((k * 2.6 + 0.3, 0.3), (k * 2.6 + 0.9, 1), stroke: verde, mark: (end: "stealth"))
+    content((k * 2.6 + 1.1, 1.25), text(fill: verde)[$y$])
+  }
+  content((10.6, 0), [$dots.c$])
+}), [In orizzontale riduco dentro $Omega$ e resto sempre fermo; in qualunque momento posso invece applicare $lambda x. y$, che butta via l'argomento e dà $y$])
+
+Church-Rosser garantisce che *in tutti i casi in cui la riduzione termina, il risultato è lo stesso*: non possono esserci risultati diversi.

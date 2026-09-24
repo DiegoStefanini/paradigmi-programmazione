@@ -14,5 +14,10 @@ Workflow generale: `../CLAUDE.md`.
 | Giorno | Materiale (`slide/`) | Grezzo | Argomento |
 |---|---|---|---|
 | 21 set 2026 | `Lambda calcolo - Prima Parte.pdf`, tutte le 67 slide | `grezzi/2026-09-21.md` | calcolabilità, Turing/von Neumann/Church, sintassi λ, applicazione, convenzioni, alberi, variabili libere e legate |
+| 22 set 2026 | `Lambda calcolo - Parte fino al 23 settembre.pdf`, slide 68-116 (le 1-67 sono la Prima Parte) | `grezzi/22-09.md` (vuoto) | FV, α-conversione, sostituzione capture-avoiding, β-riduzione, forma normale, β-equivalenza, Church-Rosser, Ω |
 
 Nota: nel PDF λ è un glifo che `pdftotext` rende come "l": nella dispensa scrivere sempre λ (`$lambda$`).
+
+Fin dove si è arrivati: slide 116 (non terminazione e confluenza).
+
+Refusi nelle slide: parentesi sbilanciate negli esempi di sostituzione (slide 94-96); nella β-equivalenza pdftotext perde le parentesi: è $(λx.x)z ≡_β (λx.λy.x)zw$.
