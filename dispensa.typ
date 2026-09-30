@@ -234,8 +234,6 @@ La seconda è l'*applicazione*. Applicare una funzione = darle un *parametro att
 
 La selezione passo per passo: $((lambda x. lambda y. x) z) w arrow.r (lambda y. z) w arrow.r z$. Nel primo passo metto $z$ al posto di $x$ nel corpo $lambda y. x$; nel secondo metto $w$ al posto di $y$ nel corpo $z$, ma $y$ non c'è, quindi $w$ sparisce e resta $z$.
 
-#nota[$lambda x. lambda y. x$ ha legge di corrispondenza $forall x. f(x) = g$ dove $g(y) = x$: una funzione che restituisce una funzione. È così che si scrive $f(x, y) = x$ con funzioni di un solo argomento.]
-
 Queste due operazioni, più le variabili, sono tutto il linguaggio. Un programma è un'espressione (*λ-espressione*). Ci sono solo tre modi di costruirla:
 
 #align(center, box(stroke: 1pt + blu, inset: 12pt, radius: 4pt, grid(columns: 2, align: left, inset: 5pt,
@@ -243,7 +241,6 @@ Queste due operazioni, più le variabili, sono tutto il linguaggio. Un programma
   [$quad | space lambda x. e$], [astrazione funzionale (dichiarazione di funzione)],
   [$quad | space e space e$], [applicazione (chiamata di funzione)],
 )))
-#align(center, text(fill: red, weight: "bold")[Niente altro! La sintassi è finita.])
 
 Si legge: un'espressione $e$ è una variabile, *oppure* ($|$) un'astrazione, *oppure* un'applicazione. La definizione è *ricorsiva*: dentro $lambda x. e$ e dentro $e space e$ ci sono altre espressioni, costruite con le stesse tre regole. Per esempio $(lambda x. x) y$ è un'applicazione di $lambda x. x$ (astrazione, con corpo la variabile $x$) alla variabile $y$.
 
@@ -256,13 +253,13 @@ $lambda x. e$ è una *funzione anonima*: non ha nome, e $x$ è la dichiarazione 
   [Java (si chiamano lambda)], [`(int x) -> x + 1`],
 )))
 
-Da qui in poi useremo lettere come $e$, $e_1$, $e_2$, $e_3$. *Non* sono variabili del λ-calcolo: sono nomi che stanno per *un'espressione qualsiasi*, come in algebra $a + b$ vale per due numeri qualsiasi. Così una regola scritta con $e_1$ ed $e_2$ vale per tutte le espressioni.
+Da qui in poi useremo lettere come $e$, $e_1$, $e_2$, $e_3$. *Non* sono variabili del λ-calcolo: sono nomi che stanno per *un'espressione qualsiasi*, come in algebra $a + b$ vale per due numeri qualsiasi.
 
-Per esempio $e_1 e_2$ vuol dire "un'espressione seguita da un'altra", cioè un'*applicazione*: $e_1$ è la funzione che chiamo, $e_2$ è l'argomento che le passo (il parametro attuale). In JavaScript si scriverebbe `e1(e2)`. La funzione non deve per forza avere un nome: la sua definizione può stare *direttamente dentro* la chiamata.
+In $e_1 e_2$, $e_1$ è la funzione che chiamo ed $e_2$ l'argomento che le passo (in JavaScript `e1(e2)`). La funzione non deve per forza avere un nome: la sua definizione può stare *direttamente dentro* la chiamata.
 
 $ underbrace((lambda x. (lambda y. x y)), e_1 = "la funzione") space underbrace((lambda z. z), e_2 = "l'argomento") $
 
-Se si scrive tutto senza parentesi, però, non si capisce cosa va con cosa. $lambda x. x y$ è la funzione $lambda x. (x y)$ (prende $x$ e restituisce $x$ applicata a $y$) oppure $(lambda x. x) y$ (l'identità applicata a $y$)? Per decidere, e per non scrivere troppe parentesi, valgono due convenzioni (importanti):
+Senza parentesi $lambda x. x y$ è ambiguo: è $lambda x. (x y)$ (prende $x$ e restituisce $x$ applicata a $y$) oppure $(lambda x. x) y$ (l'identità applicata a $y$)? Decidono due convenzioni (importanti), che servono anche a scrivere meno parentesi:
 
 #grid(columns: 2, gutter: 1em,
   box(stroke: 0.6pt, inset: 8pt, width: 100%, fill: rgb("#fff3c4"))[
@@ -275,8 +272,6 @@ Se si scrive tutto senza parentesi, però, non si capisce cosa va con cosa. $lam
     Con più applicazioni di fila si parte da sinistra: prima $e_1$ applicata a $e_2$, poi il risultato applicato a $e_3$. Come `f(a)(b)` in JavaScript. \
     $e_1 e_2 e_3$ #h(0.3em) è #h(0.3em) $(e_1 e_2) e_3$],
 )
-
-La selezione vista sopra ne è un esempio: $(lambda x. lambda y. x) z w$ è $((lambda x. lambda y. x) z) w$, cioè prima passo $z$, poi $w$.
 
 *Esercizio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
 + Regola 1. Il corpo di $lambda x$ è tutto il resto, $x lambda y. x y z$; dentro, il corpo di $lambda y$ è $x y z$: #h(0.3em) $lambda x. (x lambda y. (x y z))$
@@ -313,7 +308,7 @@ Una stessa variabile può voler dire cose diverse in punti diversi:
 
 La $x$ nel $lambda x$ interno è legata a *quel* $lambda$, non a quello esterno. Tre $x$, due significati: da qui nasce il conflitto di nomi.
 
-Ecco il problema che questo crea. Applicando senza fare attenzione ai nomi:
+Applicando senza fare attenzione ai nomi nasce un problema:
 
 #align(center, block(breakable: false, table(columns: 3, align: left,
   [], [Espressione], [Risultato],
@@ -338,13 +333,13 @@ FV sta per _Free Variables_. Una variabile che non è libera è *legata* (_bound
 *Esercizio*: $"FV"((lambda x. lambda y. x y)((lambda z. z) k))$
 $ = "FV"(lambda x. lambda y. x y) union "FV"((lambda z. z) k) = emptyset union {k} = {k} $
 
-Visto che un parametro è solo un segnaposto, cambiargli nome non cambia niente. $lambda a. a c$ e $lambda b. b c$ si dicono *α-equivalenti*: $a$ e $b$ non hanno un significato proprio, conta solo il *ruolo* che hanno nell'espressione. Lo stesso vale nei linguaggi:
+Cambiare nome a un parametro non cambia niente: $lambda a. a c$ e $lambda b. b c$ si dicono *α-equivalenti*, perché $a$ e $b$ contano solo per il *ruolo* che hanno nell'espressione. Lo stesso vale nei linguaggi:
 
 #align(center, grid(columns: 3, gutter: 1.5em, align: horizon,
   `function(a){ return a + 1; }`, [è α-equivalente a], `function(b){ return b + 1; }`,
 ))
 
-Espressioni α-equivalenti rappresentano *lo stesso programma*. Rinominare una variabile legata con una variabile fresca (che non compare nell'espressione) si chiama *α-conversione*. Serve a passare da $lambda x. x$ a $lambda z. z$, e soprattutto a togliere il conflitto di nomi visto sopra (_variable shadowing_):
+Espressioni α-equivalenti rappresentano *lo stesso programma*. Rinominare una variabile legata con una variabile fresca si chiama *α-conversione*. Serve a passare da $lambda x. x$ a $lambda z. z$, e soprattutto a togliere il conflitto di nomi visto sopra (_variable shadowing_):
 
 #align(center, grid(columns: 3, gutter: 1.5em, align: horizon,
   legami(("λ", "x", ".", "x", "(", "λ", "x", ".", "x", ")", "x"), ((1, 3), (6, 8), (1, 10))),
@@ -360,8 +355,6 @@ Cosa vuol dire *eseguire* (valutare) una λ-espressione? La valutazione, _eval_,
 #align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt)[
   $"eval"((lambda x. e_1) e_2)$: #h(0.5em) rimpiazzo ogni occorrenza di $x$ in $e_1$ con $e_2$, poi valuto il termine che ne risulta.
 ])
-
-È la chiamata di una funzione: eseguo il corpo $e_1$ dopo aver messo il *parametro attuale* $e_2$ al posto del *parametro formale* $x$.
 
 La *sostituzione* si scrive $e_1 {x := e_2}$ (oppure $e_1 {e_2 slash x}$): è $e_1$ con ogni occorrenza *libera* di $x$ sostituita da $e_2$. Per esempio $x z {x := lambda y. y} = (lambda y. y) z$.
 
@@ -394,7 +387,7 @@ La soluzione è la *sostituzione che evita la cattura* (_capture-avoiding substi
 
 Un esempio completo: $(lambda x. lambda y. ((lambda z. z) x)) y$. Il passo $(lambda y. ((lambda z. z) x)){x := y}$ fatto alla cieca *non va bene*: le due $y$ sono diverse ($y in "FV"(e)$). Quindi, con $k$ fresca:
 
-$ (lambda y. ((lambda z. z) x)){x := y} = (lambda k. ((lambda z. z) x)){x := y} = lambda k. ((lambda z. z) y) $
+$ (lambda y. ((lambda z. z) x)){x := y} attach(equiv, br: alpha) (lambda k. ((lambda z. z) x)){x := y} = lambda k. ((lambda z. z) y) $
 
 *Esercizi*. L'espressione è sempre la stessa, cambia la variabile da sostituire ($attach(equiv, br: alpha)$ vuol dire "α-equivalente", cioè uguale a meno di rinominare):
 
@@ -405,12 +398,11 @@ $ (lambda y. ((lambda z. z) x)){x := y} = (lambda k. ((lambda z. z) x)){x := y} 
   [$((lambda x. y x) w){w := lambda k. k x}$], [$(lambda x. y x)(lambda k. k x)$ #h(0.5em) #text(9pt)[$w$ non è sotto nessun $lambda$: caso applicazione]],
 )
 
-Con la sostituzione si scrive la regola fondamentale del λ-calcolo, quella che lo rende un modello di calcolo universale, la *β-riduzione*:
+Con la sostituzione si scrive la regola fondamentale del λ-calcolo, la *β-riduzione*:
 
 #align(center, box(stroke: 1.5pt + red, inset: 12pt, radius: 4pt, text(14pt)[$(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$]))
 
 - Cattura esattamente l'*applicazione di funzione*: $(lambda x. x) 3 arrow.r 3$.
-- Il risultato è il corpo $e_1$ in cui il parametro formale $x$ è sostituito da copie dell'argomento $e_2$.
 - Un *redex* (espressione riducibile) è una sottoespressione della forma $(lambda x. e_1) e_2$, a cui la regola si può applicare.
 
 Esempio: $(lambda x. lambda z. x z) y$. Il parametro formale è $x$, il corpo è $e_1 = lambda z. x z$, il parametro attuale è $e_2 = y$:
@@ -455,10 +447,10 @@ La valutazione va avanti scegliendo un redex e riducendolo. Quando non ci sono p
 
 Un passo di β-riduzione è un passo di calcolo, quindi $arrow.r.double$ (la *chiusura riflessiva e transitiva* di $arrow.r$) rappresenta una computazione qualsiasi. Quando $e_1 arrow.r.double e_2$ si dice che $e_1$ è *β-riducibile* a $e_2$.
 
-Con $arrow.r.double$ si definisce quando due espressioni sono "uguali". $e_1$ ed $e_2$ sono *β-equivalenti*, $e_1 attach(equiv, br: beta) e_2$, se:
+#block(breakable: false)[Con $arrow.r.double$ si definisce quando due espressioni sono "uguali". $e_1$ ed $e_2$ sono *β-equivalenti*, $e_1 attach(equiv, br: beta) e_2$, se:
 + sono identiche a meno di α-conversione, oppure
 + $e_1 arrow.r.double e_2$ oppure $e_2 arrow.r.double e_1$, oppure
-+ $e_1 arrow.r.double e$ e anche $e_2 arrow.r.double e$ (arrivano alla stessa espressione).
++ $e_1 arrow.r.double e$ e anche $e_2 arrow.r.double e$ (arrivano alla stessa espressione).]
 
 #align(center, canvas(length: 1cm, {
   import draw: *
@@ -517,9 +509,7 @@ figura(canvas(length: 1cm, {
   line((-1.1, -1.5), (-0.2, -2.4), stroke: (paint: red, dash: "dashed", thickness: 1.2pt), mark: (end: "stealth"))
   line((1.1, -1.5), (0.2, -2.4), stroke: (paint: red, dash: "dashed", thickness: 1.2pt), mark: (end: "stealth"))
 }), [Proprietà di confluenza \ (o del diamante)]),
-[Come due strade diverse fra le vie di una città che partono dallo stesso punto $e$: qualunque giro si faccia, ci si può sempre ritrovare nello stesso punto $e'$.
-
-Per questo nell'esempio sopra entrambe le strade arrivano a $10$.])
+[Per questo nell'esempio sopra entrambe le strade arrivano a $10$.])
 
 Non sempre però si arriva a una forma normale. Il combinatore
 
@@ -682,7 +672,7 @@ alert( curriedSum(1)(2) ); // 3
 Tutto questo si regge sull'*ordine superiore* (_higher order_). Altri due esempi: $Twice$ prende una funzione e la applica due volte:
 
 $ Twice = lambda f. lambda x. f (f x) $
-$ Twice (lambda y. y + y) 2 arrow.r (lambda y. y + y)((lambda y. y + y) 2) arrow.r arrow.r (lambda y. y + y) 4 arrow.r 8 $
+$ Twice (lambda y. y + y) 2 arrow.r.double (lambda y. y + y)((lambda y. y + y) 2) arrow.r.double (lambda y. y + y) 4 arrow.r.double 8 $
 
 $Comp$ è la *composizione* $f compose g$: prende due funzioni e ne restituisce una nuova che applica prima $g$ e poi $f$. Ha tipo $(B arrow.r C) times (A arrow.r B) arrow.r (A arrow.r C)$.
 
@@ -761,19 +751,19 @@ Il λ-calcolo puro ha solo funzioni. Booleani, condizionali e numeri (quello che
 Con un *booleano* si fa una scelta fra due alternative. Quindi un booleano è una funzione che, date due scelte, ne seleziona una:
 
 #align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt, grid(columns: 2, column-gutter: 3em, row-gutter: 0.7em, align: left,
-  $TRUE = lambda t. lambda f. t$, $TRUE a b arrow.r a$,
-  $FALSE = lambda t. lambda f. f$, $FALSE a b arrow.r b$,
+  $TRUE = lambda t. lambda f. t$, $TRUE a b arrow.r.double a$,
+  $FALSE = lambda t. lambda f. f$, $FALSE a b arrow.r.double b$,
 )))
 
-"Applicare un booleano" vuol dire prendere una decisione. Da qui gli operatori logici: $NOT$ applica il booleano $b$ alle due scelte $FALSE$ e $TRUE$, così $TRUE$ sceglie $FALSE$ e viceversa.
+Da qui gli operatori logici: $NOT$ applica il booleano $b$ alle due scelte $FALSE$ e $TRUE$, così $TRUE$ sceglie $FALSE$ e viceversa.
 
 $ NOT = lambda b. b FALSE TRUE $
-$ NOT TRUE arrow.r TRUE FALSE TRUE = (lambda t. lambda f. t) FALSE TRUE arrow.r FALSE \
-  NOT FALSE arrow.r FALSE FALSE TRUE = (lambda t. lambda f. f) FALSE TRUE arrow.r TRUE $
+$ NOT TRUE arrow.r TRUE FALSE TRUE = (lambda t. lambda f. t) FALSE TRUE arrow.r.double FALSE \
+  NOT FALSE arrow.r FALSE FALSE TRUE = (lambda t. lambda f. f) FALSE TRUE arrow.r.double TRUE $
 
 Il *condizionale* sceglie in base al valore della condizione: passa i due rami al booleano $c$.
 
-$ IF = lambda c. lambda "then". lambda "else". c "then" "else" #h(3em) IF TRUE a b arrow.r a #h(1.5em) IF FALSE a b arrow.r b $
+$ IF = lambda c. lambda "then". lambda "else". c "then" "else" #h(3em) IF TRUE a b arrow.r.double a #h(1.5em) IF FALSE a b arrow.r.double b $
 
 #block(breakable: false, $
   IF TRUE e_1 e_2 &= (lambda c. lambda "then". lambda "else". c "then" "else") TRUE e_1 e_2 \
@@ -804,7 +794,7 @@ Le operazioni sui numerali:
 
 #block(breakable: false, table(columns: (auto, 1fr), align: left,
   [Definizione], [Come funziona],
-  [$SUCC = lambda n. lambda s. lambda z. s (n s z)$], [$n s z$ applica $s$ a $z$ per $n$ volte; poi una $s$ in più: in tutto $n + 1$ volte. \ $SUCC C_1 arrow.r C_2$],
+  [$SUCC = lambda n. lambda s. lambda z. s (n s z)$], [$n s z$ applica $s$ a $z$ per $n$ volte; poi una $s$ in più: in tutto $n + 1$ volte. \ $SUCC C_1 arrow.r.double C_2$],
   [$PLUS = lambda m. lambda n. lambda s. lambda z. m s (n s z)$ \ oppure $lambda m. lambda n. m SUCC n$], [$n s z$ calcola $n$; $m s (dots)$ ci applica $s$ altre $m$ volte. Nella seconda forma: applico $SUCC$ a $n$ per $m$ volte. \ $PLUS C_i C_j arrow.r.double SUCC^i (C_j)$],
   [$TIMES = lambda m. lambda n. m (PLUS n) C_0$], [$m$ conta le ripetizioni: partendo da $C_0$, sommo $n$ per $m$ volte. \ $TIMES C_i C_j arrow.r.double PLUS C_j (PLUS C_j (dots (PLUS C_j C_0)))$ con $i$ somme],
 ))
