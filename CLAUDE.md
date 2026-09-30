@@ -20,4 +20,3 @@ Nota: nel PDF λ è un glifo che `pdftotext` rende come "l": nella dispensa scri
 
 Fin dove si è arrivati: slide 116 (non terminazione e confluenza).
 
-Refusi nelle slide: parentesi sbilanciate negli esempi di sostituzione (slide 94-96); nella β-equivalenza pdftotext perde le parentesi: è $(λx.x)z ≡_β (λx.λy.x)zw$.
