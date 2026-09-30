@@ -70,6 +70,16 @@
   align(horizon, text(13pt, ingresso)), align(horizon)[→],
   box(stroke: 1pt + blu, fill: rgb("#eef4ff"), inset: 10pt, radius: 4pt, text(13pt, f)),
   align(horizon)[→], align(horizon, text(13pt, uscita))))
+// nomi di più lettere usabili nelle formule
+#let (TRUE, FALSE, NOT, IF, SUCC, PLUS, TIMES, ISZERO, Twice, Comp, iff, thn, els) = ("TRUE", "FALSE", "NOT", "IF", "SUCC", "PLUS", "TIMES", "ISZERO", "Twice", "Comp", "if", "then", "else").map(math.op)
+// regola di inferenza: sopra la riga l'ipotesi, sotto la conclusione
+#let regola(sopra, sotto) = $display(frac(sopra, sotto))$
+// riquadro con un insieme di regole
+#let regole(titolo, colore, ..r) = box(stroke: 1pt + colore, inset: 9pt, radius: 4pt, width: 100%, align(center)[
+  #text(fill: colore, weight: "bold", titolo) #v(0.2em)
+  #r.pos().join(v(0.5em))])
+// corpo del numerale di Church n: s applicata n volte a z
+#let church(n) = if n == 0 { $z$ } else if n == 1 { $s z$ } else { $s (#church(n - 1))$ }
 #let albero(t) = canvas(length: 0.8cm, {
   import draw: *
   tree.tree(t, spread: 0.9, grow: 1.1, draw-node: (node, ..) => content((), text(fill: blu, node.content)))
@@ -224,7 +234,7 @@ La seconda è l'*applicazione*. Applicare una funzione = darle un *parametro att
 
 La selezione passo per passo: $((lambda x. lambda y. x) z) w arrow.r (lambda y. z) w arrow.r z$. Nel primo passo metto $z$ al posto di $x$ nel corpo $lambda y. x$; nel secondo metto $w$ al posto di $y$ nel corpo $z$, ma $y$ non c'è, quindi $w$ sparisce e resta $z$.
 
-#nota[$lambda x. lambda y. x$ ha legge di corrispondenza $forall x. f(x) = g$ dove $g(y) = x$: una funzione che restituisce una funzione. È un modo alternativo di scrivere $f(x, y) = x$ con una funzione di un solo argomento.]
+#nota[$lambda x. lambda y. x$ ha legge di corrispondenza $forall x. f(x) = g$ dove $g(y) = x$: una funzione che restituisce una funzione. È così che si scrive $f(x, y) = x$ con funzioni di un solo argomento.]
 
 Queste due operazioni, più le variabili, sono tutto il linguaggio. Un programma è un'espressione (*λ-espressione*). Ci sono solo tre modi di costruirla:
 
@@ -435,8 +445,6 @@ Il λ-calcolo è di *ordine superiore*: una funzione può prendere funzioni come
   [$(lambda x. lambda y. x y) z k$], [$arrow.r (lambda y. z y) k arrow.r z k$],
 ))
 
-#nota[$(lambda y. 3 + y)$ è una funzione a sé: somma 3 a quello che le passi. Applicando una funzione di due argomenti a uno solo ottieni una funzione che aspetta l'altro.]
-
 La valutazione va avanti scegliendo un redex e riducendolo. Quando non ci sono più redex l'espressione è in *forma normale β*: non si può più riscrivere con la β-riduzione, ed è il *risultato finale*, il *valore calcolato*. Per esempio $lambda x. x$ e $lambda t. lambda f. t$ sono valori: *le funzioni sono valori*.
 
 #align(center, table(columns: 2, align: left,
@@ -466,7 +474,7 @@ Con $arrow.r.double$ si definisce quando due espressioni sono "uguali". $e_1$ ed
 
 *Intuizione*: due espressioni sono β-equivalenti quando sono indistinguibili dal punto di vista del calcolo, cioè calcolano gli stessi risultati.
 
-== Confluenza e non terminazione
+== Ordine di riduzione e strategie
 
 Quando un'espressione contiene più redex, si può scegliere da quale cominciare. In $(lambda x. x)((lambda y. y) z)$ ce ne sono due:
 
@@ -545,3 +553,263 @@ Una stessa espressione può *terminare* facendo certe scelte di riduzione e *non
 }), [In orizzontale riduco dentro $Omega$ e resto sempre fermo; in qualunque momento posso invece applicare $lambda x. y$, che butta via l'argomento e dà $y$])
 
 Church-Rosser garantisce che *in tutti i casi in cui la riduzione termina, il risultato è lo stesso*: non possono esserci risultati diversi.
+
+Le scelte possibili sono di tre tipi. In $(lambda x. ((lambda y. y) x))((lambda z. z) k)$:
+
+#figura(canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), box(stroke: 0.6pt, inset: 6pt)[$(lambda x. ((lambda y. y) x))((lambda z. z) k)$])
+  let rami = ((-5.2, [valuto il corpo], $(lambda x. x)((lambda z. z) k)$, red),
+              (0, [non valuto l'argomento], $(lambda y. y)((lambda z. z) k)$, blu),
+              (5.2, [valuto l'argomento], $(lambda x. ((lambda y. y) x)) k$, verde))
+  for (x, t, e, c) in rami {
+    line((x * 0.25, -0.45), (x * 0.85, -1.75), stroke: c, mark: (end: "stealth"))
+    content((x, -1.2), box(fill: white, inset: 2pt, text(8pt, fill: c, t)))
+    content((x, -2.2), box(stroke: 0.6pt + c, inset: 6pt, e))
+    line((x * 0.85, -2.65), (x * 0.12, -3.75), stroke: c, mark: (end: "stealth"))
+  }
+  content((0, -4.1), box(stroke: 1pt + verde, inset: 6pt)[$k$])
+}), [Tre scelte diverse, stesso risultato $k$])
+
+Succede lo stesso in un linguaggio. Con `function f(x) { 3+2 + x }` e la chiamata `f(2+1)` posso calcolare l'argomento prima di passarlo (`f(3)`), passarlo non calcolato e lasciarlo alla funzione (`f(2+1)`), oppure semplificare il corpo (`5 + x`).
+
+Una *strategia di valutazione* fissa quale scelta fare. Valutare un'applicazione $(lambda x. e) e'$ ha tre passi: valuto l'espressione che definisce la funzione, passo il parametro, valuto il corpo. Le due strategie cambiano il secondo passo, il *passaggio dei parametri*:
+
+#align(center, block(breakable: false, table(columns: 3, align: left,
+  [], [Call-by-value (CBV), _eager_], [Call-by-name (CBN), _lazy_],
+  [Cosa fa con l'argomento $e'$], [lo valuta *prima* della β-riduzione], [fa *subito* la β-riduzione],
+  [Al posto di $x$ finisce], [il *valore* dell'argomento], [l'*espressione non valutata*],
+  [Redex scelto], [il più interno], [il più esterno],
+  [Linguaggi], [OCaml e la maggior parte], [Haskell],
+)))
+
+Le strategie si scrivono con *regole*: sopra la riga l'ipotesi, sotto la conclusione. La prima a sinistra dice: se $e_1$ fa un passo e diventa $e'$, allora $e_1 e_2$ diventa $e' e_2$.
+
+#grid(columns: (1.25fr, 1fr, 1fr), gutter: 0.6em,
+  regole([Standard (senza strategia)], red,
+    $(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$,
+    [#regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$) #h(0.8em) #regola($e_2 arrow.r e'$, $e_1 e_2 arrow.r e_1 e'$)],
+    regola($e arrow.r e'$, $lambda x. e arrow.r lambda x. e'$)),
+  regole([Call-by-value], verde,
+    $(lambda x. e_1) v_2 arrow.r e_1 {x := v_2}$,
+    regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$),
+    regola($e_2 arrow.r e'$, $v_1 e_2 arrow.r v_1 e'$)),
+  regole([Call-by-name], blu,
+    $(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$,
+    regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$)),
+)
+
+- *Standard*: qualsiasi redex si può ridurre in qualsiasi momento, anche dentro il corpo di una funzione (terza riga). Non è deterministica.
+- *Call-by-value*: $v$ sta per un *valore*, cioè un'espressione già valutata. La β-riduzione scatta solo quando l'argomento è un valore $v_2$; l'argomento $e_2$ si riduce solo quando la funzione è già un valore $v_1$.
+- *Call-by-name*: si riduce la parte funzione finché diventa $lambda x. e_1$, poi si applica. L'argomento non si tocca.
+
+#nota[CBV e CBN *non hanno la regola che riduce il corpo di una funzione*. Quindi $lambda x. ((lambda y. y) z)$ con la riduzione standard diventa $lambda x. z$, con le due strategie resta così com'è: per loro una funzione è già un valore, anche se dentro ha un redex. È quello che succede nei linguaggi: il corpo di una funzione non viene eseguito finché la funzione non viene chiamata.]
+
+La stessa espressione con le due strategie (usando numeri e $+$):
+
+#grid(columns: (1fr, 1fr), gutter: 1em,
+  box(stroke: 0.6pt + verde, inset: 8pt, width: 100%)[
+    #text(fill: verde)[*Call-by-value*: redex più interno] #v(0.1em)
+    $&(lambda x. lambda y. y x)(5 + 2)(lambda x. x + 1) \
+     arrow.r &(lambda x. lambda y. y x) 7 (lambda x. x + 1) \
+     arrow.r &(lambda y. y 7)(lambda x. x + 1) \
+     arrow.r &(lambda x. x + 1) 7 \
+     arrow.r &7 + 1 arrow.r 8$],
+  box(stroke: 0.6pt + blu, inset: 8pt, width: 100%)[
+    #text(fill: blu)[*Call-by-name*: redex più esterno] #v(0.1em)
+    $&(lambda x. lambda y. y x)(5 + 2)(lambda x. x + 1) \
+     arrow.r &(lambda y. y (5 + 2))(lambda x. x + 1) \
+     arrow.r &(lambda x. x + 1)(5 + 2) \
+     arrow.r &(5 + 2) + 1 \
+     arrow.r &7 + 1 arrow.r 8$],
+)
+
+Conta quale strategia si sceglie?
+- Se la valutazione termina, *no*: per la confluenza il risultato è lo stesso.
+- La CBV valuta ogni argomento *una volta sola*. La CBN lo valuta *solo se serve*, ma può valutarlo più volte: è la strada di sinistra nella figura di $(lambda x. x + x)((lambda y. y) 5)$.
+- La CBN *termina ogni volta che è possibile*; la CBV può non terminare anche quando la CBN termina. In $(lambda x. y) Omega$ la CBN applica subito $lambda x. y$ e dà $y$; la CBV deve prima valutare l'argomento $Omega$ e non finisce mai. Non contraddice la confluenza, che dice che una strada verso il termine comune *esiste*, non quale strategia la trova.
+
+= Programmare nel lambda calcolo
+
+== Funzioni con più argomenti
+
+Nel λ-calcolo ogni funzione prende *un solo argomento*. Una funzione di due argomenti si scrive come *catena* di funzioni di un argomento, come la selezione $lambda x. lambda y. x$: la prima prende $x$ e restituisce una funzione che prende $y$.
+
+#align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt)[
+  $lambda x. (lambda y. x y)$ #h(2em) da #h(0.4em) $f : (X times Y) arrow.r Z$ #h(0.4em) a #h(0.4em) $g : X arrow.r (Y arrow.r Z)$
+])
+
+Questa trasformazione si chiama *currying* (dal logico Haskell Curry). $g$ prende un $X$ e restituisce una funzione da $Y$ a $Z$, e calcola gli stessi risultati di $f$:
+
+$ (lambda x. lambda y. x + y) 10 arrow.r lambda y. 10 + y #h(3em) (lambda y. 10 + y) 5 = 15 $
+
+$lambda y. 10 + y$ è una funzione a sé: somma 10 a quello che le passi. Dare a una funzione solo il primo argomento si chiama *applicazione parziale*: ottieni una funzione che aspetta gli altri.
+
+L'espressività non cambia, il risultato è lo stesso che avrei con due parametri insieme:
+
+#align(center, table(columns: 2, align: left,
+  [Definizione], [Chiamata],
+  [$F = lambda (x, y). e$], [$F(e_1, e_2) arrow.r e {x := e_1}{y := e_2}$],
+  [$F = lambda x. lambda y. e$], [$(F e_1) e_2 arrow.r (lambda y. e){x := e_1} e_2 arrow.r e {x := e_1}{y := e_2}$],
+))
+
+In JavaScript, `curry` prende una funzione `f` che vuole due argomenti insieme e restituisce una funzione che li prende uno alla volta (nota le funzioni annidate):
+
+#grid(columns: (1fr, 1fr), gutter: 1em,
+```js
+function curry(f) {
+  return function(a) {
+    return function(b) {
+      return f(a, b);
+    };
+  };
+}
+```,
+```js
+function sum(a, b) { return a + b; }
+
+let curriedSum = curry(sum);
+let h = curriedSum(1); // somma sempre 1
+alert( h(2) );         // 3
+alert( curriedSum(1)(2) ); // 3
+```)
+
+`sum` passa da `Int × Int → Int` a `Int → (Int → Int)`. I vantaggi del currying:
+- *uniformità*: ogni funzione ha un solo argomento, non serve una regola a parte per più argomenti;
+- *applicazione parziale*: funzioni specializzate (come `h`) senza costrutti in più;
+- *minimalità*: astrazione e applicazione bastano per funzioni con qualsiasi numero di argomenti.
+
+Tutto questo si regge sull'*ordine superiore* (_higher order_). Altri due esempi: $Twice$ prende una funzione e la applica due volte:
+
+$ Twice = lambda f. lambda x. f (f x) $
+$ Twice (lambda y. y + y) 2 arrow.r (lambda y. y + y)((lambda y. y + y) 2) arrow.r arrow.r (lambda y. y + y) 4 arrow.r 8 $
+
+$Comp$ è la *composizione* $f compose g$: prende due funzioni e ne restituisce una nuova che applica prima $g$ e poi $f$. Ha tipo $(B arrow.r C) times (A arrow.r B) arrow.r (A arrow.r C)$.
+
+#align(center, grid(columns: 2, gutter: 3em, align: horizon,
+  $Comp = lambda f. lambda g. lambda x. f (g x)$,
+  stack(dir: ltr, spacing: 0.6em,
+    ..($x$, [→], box(stroke: 1pt + blu, fill: rgb("#eef4ff"), inset: 8pt, radius: 4pt, $g$), [→], $g x$, [→],
+       box(stroke: 1pt + blu, fill: rgb("#eef4ff"), inset: 8pt, radius: 4pt, $f$), [→], $f (g x)$).map(c => align(horizon, c))),
+))
+
+== Ricorsione: il combinatore Y
+
+Nel λ-calcolo non c'è un meccanismo per la ricorsione: le funzioni sono anonime, quindi una funzione non ha un nome con cui richiamare se stessa. Il problema si aggira con il *combinatore di punto fisso* $Y$.
+
+Un *punto fisso* di una funzione $F$ è un termine $p$ tale che $F(p) = p$. $Y$ è una funzione di ordine superiore che, data $F$, ne costruisce un punto fisso:
+
+#align(center, box(stroke: 1.5pt + red, inset: 12pt, radius: 4pt)[
+  $Y = lambda f. (lambda x. f (x x))(lambda x. f (x x))$ #h(3em) $Y F attach(equiv, br: beta) F (Y F)$
+])
+
+Perché vale la proprietà: $Y F$ e $F (Y F)$ si riducono allo stesso termine.
+
+#align(center, canvas(length: 1cm, {
+  import draw: *
+  content((0, 0), [$Y F$]); content((9, 0), [$F (Y F)$])
+  content((0, -1.3), [$(lambda x. F (x x))(lambda x. F (x x))$])
+  content((4.5, -2.8), box(stroke: 1pt + verde, inset: 6pt)[$F ((lambda x. F (x x))(lambda x. F (x x)))$])
+  line((0, -0.3), (0, -1), mark: (end: "stealth")); content((1.6, -0.65), text(8pt)[metto $F$ al posto di $f$])
+  line((0.6, -1.65), (2.3, -2.4), mark: (end: "stealth"))
+  line((8.8, -0.3), (6.6, -2.35), mark: (end: "stealth")); content((9.6, -1.3), text(8pt)[riduco $Y F$ \ dentro $F(...)$])
+  content((4.5, 0), text(fill: verde)[$attach(equiv, br: beta)$])
+}))
+
+Nel secondo passo $lambda x. F (x x)$ è passata a se stessa come argomento: ogni $x x$ diventa una nuova copia del termine di partenza, con una $F$ davanti. Continuando si ottiene $F (F (dots))$: una "copia infinita" della funzione.
+
+Per definire una funzione ricorsiva $F = chevron.l "corpo che contiene" F chevron.r$ si fanno due passi:
++ si scrive $G = lambda f. chevron.l "espressione che contiene" f chevron.r$: il nome della funzione diventa un parametro;
++ si definisce $F = Y G$.
+
+Allora $F = Y G attach(equiv, br: beta) G (Y G)$, cioè l'espressione con $Y G$ al posto di $f$; e dentro, di nuovo, $Y G attach(equiv, br: beta) G (Y G)$. $Y$ "srotola" la definizione una chiamata alla volta, senza usare il nome della funzione. Il caso che ferma la ricorsione lo deve mettere il programmatore.
+
+*Esempio: fattoriale* (supponendo di avere numeri, $iff$, $n = 0$, $n - 1$, $*$).
+
+$ G = lambda f. lambda n. iff (n = 0) thn 1 els n * f (n - 1) $
+
+Calcolo $Y G 1$. Per brevità $W = (lambda x. G (x x))(lambda x. G (x x))$, il termine che si ricopia:
+
+#block(breakable: false, $
+  Y G 1 &arrow.r W 1 \
+  &arrow.r G W 1 \
+  &arrow.r (lambda n. iff (n = 0) thn 1 els n * W (n - 1)) 1 \
+  &arrow.r iff (1 = 0) thn 1 els 1 * W (1 - 1) \
+  &arrow.r^* 1 * W 0 \
+  &arrow.r 1 * G W 0 \
+  &arrow.r 1 * (lambda n. iff (n = 0) thn 1 els n * W (n - 1)) 0 \
+  &arrow.r 1 * (iff (0 = 0) thn 1 els 0 * W (0 - 1)) \
+  &arrow.r^* 1 * 1 = 1
+$)
+
+Nell'ultimo $iff$ la condizione è vera: $W (0 - 1)$ non viene mai calcolato e la ricorsione si ferma.
+
+#nota[$Y$ funziona con la *call-by-name*, che non valuta subito gli argomenti: in $F (x x)$ l'argomento $x x$ viene ridotto solo se e quando serve nel corpo di $F$. Con la call-by-value $x x$ verrebbe valutato subito, e sarebbe un loop infinito.]
+
+Per questo in JavaScript, che è call-by-value, $Y$ è un po' diverso. `x(x)` diventa `y => x(x)(y)`: non è più un valore da calcolare subito ma una funzione che aspetta ancora l'argomento `y`, e la ricorsione parte solo quando `f` viene davvero chiamata.
+
+```js
+const Y = f => (x => x(x))(x => f(y => x(x)(y)));
+const factorial = f => (x => (x === 1 ? 1 : x * f(x - 1)));
+const YFactorial = Y(factorial)(10);
+```
+
+== Codifiche: booleani e numeri
+
+Il λ-calcolo puro ha solo funzioni. Booleani, condizionali e numeri (quello che serve per essere Turing-equivalenti) si ottengono con le *codifiche*. L'idea: non guardare cosa un valore *rappresenta* ma cosa ci si può *fare*, e descrivere quell'uso con una funzione.
+
+Con un *booleano* si fa una scelta fra due alternative. Quindi un booleano è una funzione che, date due scelte, ne seleziona una:
+
+#align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt, grid(columns: 2, column-gutter: 3em, row-gutter: 0.7em, align: left,
+  $TRUE = lambda t. lambda f. t$, $TRUE a b arrow.r a$,
+  $FALSE = lambda t. lambda f. f$, $FALSE a b arrow.r b$,
+)))
+
+"Applicare un booleano" vuol dire prendere una decisione. Da qui gli operatori logici: $NOT$ applica il booleano $b$ alle due scelte $FALSE$ e $TRUE$, così $TRUE$ sceglie $FALSE$ e viceversa.
+
+$ NOT = lambda b. b FALSE TRUE $
+$ NOT TRUE arrow.r TRUE FALSE TRUE = (lambda t. lambda f. t) FALSE TRUE arrow.r FALSE \
+  NOT FALSE arrow.r FALSE FALSE TRUE = (lambda t. lambda f. f) FALSE TRUE arrow.r TRUE $
+
+Il *condizionale* sceglie in base al valore della condizione: passa i due rami al booleano $c$.
+
+$ IF = lambda c. lambda "then". lambda "else". c "then" "else" #h(3em) IF TRUE a b arrow.r a #h(1.5em) IF FALSE a b arrow.r b $
+
+#block(breakable: false, $
+  IF TRUE e_1 e_2 &= (lambda c. lambda "then". lambda "else". c "then" "else") TRUE e_1 e_2 \
+  &arrow.r (lambda "then". lambda "else". TRUE "then" "else") e_1 e_2 \
+  &arrow.r (lambda "else". TRUE e_1 "else") e_2 \
+  &arrow.r TRUE e_1 e_2 = (lambda t. lambda f. t) e_1 e_2 \
+  &arrow.r (lambda f. e_1) e_2 arrow.r e_1
+$)
+
+*Esercizio*: calcolare $IF FALSE e_1 e_2$.
+
+I *numeri naturali* hanno una definizione induttiva: zero è un naturale; se $n$ è un naturale, anche $"Succ" n$ (il successore) lo è. Le operazioni si definiscono allo stesso modo:
+
+#align(center, table(columns: 3, align: left,
+  [], [Caso zero], [Caso successore],
+  [Somma], [$m + 0 = m$], [$m + "Succ" n = "Succ"(m + n)$],
+  [Prodotto], [$m times 0 = 0$], [$m times "Succ" n = m times n + m$],
+))
+
+Nel λ-calcolo un numero si codifica con *cosa ci si fa*: ripetere qualcosa $n$ volte. Il *numerale di Church* $C_n$ prende una funzione $s$ (il successore) e un valore iniziale $z$ (lo zero), e applica $s$ a $z$ per $n$ volte. Il numero 3 vuol dire "fai una cosa tre volte".
+
+#align(center, box(stroke: 1pt + verde, inset: 10pt, radius: 4pt, grid(columns: 3, column-gutter: 2.5em, row-gutter: 0.7em, align: left,
+  ..range(4).map(n => $C_#n = lambda s. lambda z. #church(n)$),
+  $C_n = lambda s. lambda z. s^n z$,
+)))
+
+Le operazioni sui numerali:
+
+#block(breakable: false, table(columns: (auto, 1fr), align: left,
+  [Definizione], [Come funziona],
+  [$SUCC = lambda n. lambda s. lambda z. s (n s z)$], [$n s z$ applica $s$ a $z$ per $n$ volte; poi una $s$ in più: in tutto $n + 1$ volte. \ $SUCC C_1 arrow.r C_2$],
+  [$PLUS = lambda m. lambda n. lambda s. lambda z. m s (n s z)$ \ oppure $lambda m. lambda n. m SUCC n$], [$n s z$ calcola $n$; $m s (dots)$ ci applica $s$ altre $m$ volte. Nella seconda forma: applico $SUCC$ a $n$ per $m$ volte. \ $PLUS C_i C_j arrow.r.double SUCC^i (C_j)$],
+  [$TIMES = lambda m. lambda n. m (PLUS n) C_0$], [$m$ conta le ripetizioni: partendo da $C_0$, sommo $n$ per $m$ volte. \ $TIMES C_i C_j arrow.r.double PLUS C_j (PLUS C_j (dots (PLUS C_j C_0)))$ con $i$ somme],
+))
+
+*Esercizi*:
++ definire $ISZERO$ in modo che $ISZERO C_0 = TRUE$ e $ISZERO C_i = FALSE$ per $i != 0$; calcolare $ISZERO C_1$;
++ calcolare $SUCC C_1$ passo per passo;
++ calcolare $PLUS C_1 C_1$.
