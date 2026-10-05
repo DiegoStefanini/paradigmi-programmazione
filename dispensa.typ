@@ -71,9 +71,12 @@
   box(stroke: 1pt + blu, fill: rgb("#eef4ff"), inset: 10pt, radius: 4pt, text(13pt, f)),
   align(horizon)[→], align(horizon, text(13pt, uscita))))
 // nomi di più lettere usabili nelle formule
-#let (TRUE, FALSE, NOT, IF, SUCC, PLUS, TIMES, ISZERO, Twice, Comp, iff, thn, els) = ("TRUE", "FALSE", "NOT", "IF", "SUCC", "PLUS", "TIMES", "ISZERO", "Twice", "Comp", "if", "then", "else").map(math.op)
+#let (TRUE, FALSE, NOT, AND, OR, IF, SUCC, PLUS, TIMES, ISZERO, Twice, Comp, iff, thn, els, tt, ff, succ, pred, isZero) = ("TRUE", "FALSE", "NOT", "AND", "OR", "IF", "SUCC", "PLUS", "TIMES", "ISZERO", "Twice", "Comp", "if", "then", "else", "true", "false", "succ", "pred", "isZero").map(math.op)
 // regola di inferenza: sopra la riga l'ipotesi, sotto la conclusione
 #let regola(sopra, sotto) = $display(frac(sopra, sotto))$
+// regola con nome a destra
+#let centro(x) = pad(y: 0.6em, align(center, x))
+#let inf(sopra, sotto, nome) = $regola(sopra, sotto) #text(8pt, fill: gray)[(#nome)]$
 // riquadro con un insieme di regole
 #let regole(titolo, colore, ..r) = box(stroke: 1pt + colore, inset: 9pt, radius: 4pt, width: 100%, align(center)[
   #text(fill: colore, weight: "bold", titolo) #v(0.2em)
@@ -761,6 +764,17 @@ $ NOT = lambda b. b FALSE TRUE $
 $ NOT TRUE arrow.r TRUE FALSE TRUE = (lambda t. lambda f. t) FALSE TRUE arrow.r.double FALSE \
   NOT FALSE arrow.r FALSE FALSE TRUE = (lambda t. lambda f. f) FALSE TRUE arrow.r.double TRUE $
 
+Con la stessa idea, $AND$ e $OR$ usano il primo booleano $b$ per scegliere. $AND$: se $b$ è vero il risultato è $c$, altrimenti $FALSE$. $OR$: se $b$ è vero il risultato è $TRUE$, altrimenti $c$.
+
+$ AND = lambda b. lambda c. b c FALSE #h(3em) OR = lambda b. lambda c. b TRUE c $
+
+#block(breakable: false, $
+  AND TRUE TRUE &arrow.r.double TRUE TRUE FALSE = (lambda t. lambda f. t) TRUE FALSE \
+  &arrow.r (lambda f. TRUE) FALSE arrow.r TRUE \
+  OR TRUE FALSE &arrow.r.double TRUE TRUE FALSE = (lambda t. lambda f. t) TRUE FALSE \
+  &arrow.r (lambda f. TRUE) FALSE arrow.r TRUE
+$)
+
 Il *condizionale* sceglie in base al valore della condizione: passa i due rami al booleano $c$.
 
 $ IF = lambda c. lambda "then". lambda "else". c "then" "else" #h(3em) IF TRUE a b arrow.r.double a #h(1.5em) IF FALSE a b arrow.r.double b $
@@ -799,7 +813,199 @@ Le operazioni sui numerali:
   [$TIMES = lambda m. lambda n. m (PLUS n) C_0$], [$m$ conta le ripetizioni: partendo da $C_0$, sommo $n$ per $m$ volte. \ $TIMES C_i C_j arrow.r.double PLUS C_j (PLUS C_j (dots (PLUS C_j C_0)))$ con $i$ somme],
 ))
 
+$SUCC C_1$ passo per passo. Per non confondere le variabili, in $C_1$ rinomino $s, z$ in $s', z'$; il secondo passo riduce dentro il corpo della funzione (riduzione standard):
+
+$ SUCC C_1 = (lambda n. lambda s. lambda z. s (n s z)) C_1 &arrow.r lambda s. lambda z. s (C_1 s z) \
+  &= lambda s. lambda z. s ((lambda s'. lambda z'. s' z') s z) \
+  &arrow.r.double lambda s. lambda z. s (s z) = C_2 $
+
 *Esercizi*:
 + definire $ISZERO$ in modo che $ISZERO C_0 = TRUE$ e $ISZERO C_i = FALSE$ per $i != 0$; calcolare $ISZERO C_1$;
-+ calcolare $SUCC C_1$ passo per passo;
 + calcolare $PLUS C_1 C_1$.
+
+Quindi il λ-calcolo è *Turing completo*: con codifiche furbe rappresenta quasi ogni costrutto dei linguaggi. Ma i programmi sarebbero lenti (migliaia di chiamate di funzione), lunghi (centinaia di righe) e difficili da capire. In pratica si usano linguaggi più ricchi, che hanno già le primitive giuste (numeri, booleani, `if`).
+
+= Controllo dei tipi
+
+== Perché servono i tipi
+
+Nel λ-calcolo programmi e valori sono tutti funzioni. Quindi niente impedisce di usare un valore nel posto sbagliato:
+
+$ FALSE C_0 = (lambda t. lambda f. f)(lambda s. lambda z. z) arrow.r lambda f. f $
+
+$FALSE$ si può davvero applicare a $C_0$, e produce un valore. Ma non ha senso: $FALSE$ serve a scegliere fra due alternative, non a ricevere un numero. Peggio: $C_0$ e $FALSE$ sono *lo stesso termine*, a meno di α-conversione. Lo stesso vale per $IF C_0 e_1 e_2$ o $TRUE C_0$.
+
+#align(center, canvas(length: 1cm, {
+  import draw: *
+  content((0, 1), box(stroke: 1pt + blu, inset: 6pt, radius: 3pt)[$FALSE = lambda t. lambda f. f$])
+  content((0, -1), box(stroke: 1pt + verde, inset: 6pt, radius: 3pt)[$C_0 = lambda s. lambda z. z$])
+  content((6, 0), box(stroke: 1pt + red, inset: 6pt, radius: 3pt)[$lambda x. lambda y. y$])
+  line((1.9, 0.9), (4.9, 0.15), mark: (end: "stealth")); line((1.8, -0.9), (4.9, -0.15), mark: (end: "stealth"))
+  content((3.4, 0.9), text(8pt)[$alpha$]); content((3.4, -0.9), text(8pt)[$alpha$])
+  content((6, -0.8), text(8pt)[nessuno li distingue])
+}))
+
+Non è solo un problema del λ-calcolo. Nel *linguaggio macchina* le istruzioni sono parole della macchina (sequenze di bit), i dati sono parole della macchina, e le operazioni prendono sequenze di bit e restituiscono sequenze di bit.
+
+#align(center, canvas(length: 0.6cm, {
+  import draw: *
+  for (k, b) in "01000001".clusters().enumerate() { rect((k, 0), (k + 1, 1)); content((k + 0.5, 0.5), mono(b)) }
+  for (k, t) in ("un'istruzione?", "un numero?", "un carattere?").enumerate() {
+    content((12, 1.2 - k * 0.8), anchor: "west", text(9pt, t))
+    line((8.2, 0.5), (11.8, 1.2 - k * 0.8), stroke: grigio, mark: (end: "stealth"))
+  }
+}))
+
+Un principio centrale dell'ingegneria del software è *trovare presto gli errori di programmazione* (come $FALSE C_0$). I linguaggi lo fanno con i *sistemi di tipo* (e più in generale con gli strumenti di *analisi statica*, che esaminano il programma senza eseguirlo).
+
+I *tipi* raggruppano i valori in base al comportamento che vorremmo avessero. Il tipo di un dato dice come il linguaggio permette di usarlo. Un tipo:
+- *limita i valori* che un'espressione (una variabile, una funzione) può assumere;
+- *definisce le operazioni* ammesse su quei valori e come vengono memorizzati.
+
+I linguaggi hanno dei tipi di base: interi (di varie dimensioni), numeri in virgola mobile (approssimano i reali), caratteri, booleani. $e : T$ si legge "$e$ ha tipo $T$":
+
+#align(center, table(columns: 2, align: left,
+  [Espressione], [Cosa dice],
+  [$3 + 2 : "Int"$ #text(fill: verde)[✓]], [il risultato è un intero, e $+$ è usato bene: riceve due interi],
+  [$tt : "Int"$ #text(fill: red)[✗]], [$tt$ non è un intero],
+  [$2 + tt$ #text(fill: red)[✗]], [$+$ non è applicato bene],
+))
+
+Perché controllare i tipi? In un programma grande c'è questo pezzo:
+
+```c
+if (condizione_complicata)
+  { return "hello"/10; }
+```
+
+Se i test non rendono mai vera `condizione_complicata`, la divisione di una stringa nel ramo `then` non viene mai scoperta. Poi un input non previsto dai test fa eseguire il ramo, e il programma va in errore *durante l'esecuzione*. Bastava segnalare `"hello"/10` come espressione non ammessa.
+
+#block(sticky: true)[Lo stesso codice in JavaScript e in TypeScript:]
+
+#grid(columns: (1fr, 1fr), gutter: 1em,
+[
+```js
+function addNumbers(x, y) {
+  return x + y; }
+console.log(addNumbers(3, "0"));
+```
+*JavaScript* stampa `"30"`, una stringa. Il `+` accetta anche una coppia (numero, stringa): il numero viene trasformato in stringa (*coercion*) e le due stringhe attaccate.
+],
+[
+```ts
+function addNumbers(x: number,
+                    y: number) {
+  return x + y; }
+console.log(addNumbers(3, "0"));
+```
+*TypeScript* si accorge del bug e dà un errore di tipo: _Argument of type 'string' is not assignable to parameter of type 'number'_. Come? Con delle *regole di tipo*.
+])
+
+== Sistemi di tipi
+
+#align(center, text(12pt, style: "italic")["Well-typed programs cannot go wrong"] + text(9pt)[ #h(0.5em) — Robin Milner])
+
+Un *sistema di tipi* associa tipi ai valori calcolati. Seguendo il flusso dei valori, prova a *dimostrare* che non avvengano errori di tipo. È il sistema stesso a stabilire cos'è un errore di tipo: un'operazione che si aspetta un certo tipo di valore usata con un valore per cui non ha senso.
+
+Più precisamente è un metodo *sintattico*, *effettivo* e *strutturale* per dimostrare che il programma non ha comportamenti anomali:
+
+#align(center, table(columns: 2, align: left,
+  [Metodo], [Cosa vuol dire],
+  [sintattico], [l'analisi segue la struttura sintattica del programma],
+  [effettivo], [c'è un algoritmo che controlla i vincoli sui tipi, da mettere in un compilatore o in un interprete],
+  [strutturale], [il tipo di un'espressione dipende solo dai tipi delle sue sottoespressioni (*composizionale*)],
+))
+
+*Type safety* (uso corretto dei tipi): se un'espressione ha un tipo, il tipo garantisce che venga usata nel modo giusto. Senza type safety si scrivono programmi pieni di bug, e i bug sono *vulnerabilità*: un attaccante può sfruttarli per cambiare il comportamento del programma o prenderne il controllo.
+
+Il controllo può essere *statico*, *dinamico* o un misto dei due:
+
+#align(center, canvas(length: 1cm, {
+  import draw: *
+  rect((0, 0), (5, 1), fill: rgb("#eefaf2"), stroke: verde); content((2.5, 0.5))[*compilazione*]
+  rect((5.4, 0), (10.4, 1), fill: rgb("#fff0f0"), stroke: red); content((7.9, 0.5))[*esecuzione*]
+  line((5, 0.5), (5.4, 0.5), mark: (end: "stealth"))
+  content((2.5, -0.6), text(9pt, fill: verde)[controllo statico])
+  content((2.5, -1.2), text(8pt)[trova gli errori prima di eseguire, non rallenta])
+  content((7.9, -0.6), text(9pt, fill: red)[controllo dinamico])
+}))
+
+Il *type checker* (controllore dei tipi) verifica che il programma rispetti le intenzioni del programmatore, scritte nelle *annotazioni di tipo* (come `x: number`). Se un programma supera il controllo, durante l'esecuzione *non applicherà mai un'operazione a un valore del tipo sbagliato*. È una *correttezza parziale*: il programma è corretto rispetto ai tipi, non rispetto ad altri errori.
+
+Resta una domanda: come si fa a sapere che i programmi che superano il controllo si comportano davvero bene durante l'esecuzione? Servono due cose:
++ un modo per *specificare* un sistema di tipi;
++ un modo per *dimostrare* che è corretto. Per questo bisogna capire nel dettaglio cosa succede quando un programma viene eseguito, cioè il suo *significato*.
+
+Lo strumento per entrambe sono le regole di inferenza.
+
+== Regole di inferenza
+
+Le abbiamo già usate per le strategie di valutazione: sopra la riga le *premesse*, sotto la *conclusione*, a destra il *nome* della regola. Se valgono tutte le premesse, si può concludere $q$. Una regola senza premesse è un *assioma*: $q$ è un fatto accettato dal sistema.
+
+#centro(grid(columns: 2, gutter: 4em, align: bottom,
+  inf($p_1 quad p_2 quad dots quad p_n$, $q$, "nome"),
+  inf($$, $q$, "assioma"),
+))
+
+Una conclusione è valida *rispetto alle regole del sistema scelto*. Esempio: le regole per l'uguaglianza fra termini, riflessiva e transitiva:
+
+#centro(grid(columns: 2, gutter: 4em, align: bottom,
+  inf($$, $t = t$, "Rifl"),
+  inf($t_1 = t_2 quad t_2 = t_3$, $t_1 = t_3$, "Trans"),
+))
+
+Una dimostrazione mette insieme più regole in un *albero di derivazione*: le foglie in alto (premesse o assiomi), ogni riga è una regola applicata, la radice in basso è la conclusione. Dalle premesse $a = b$, $b = c$, $c = d$ si deriva $a = d$:
+
+#centro(inf($inf(a = b quad b = c, a = c, "Trans") quad c = d$, $a = d$, "Trans"))
+
+Le regole possono anche *definire un insieme*: le regole generano gli elementi, una derivazione dimostra che un elemento ci sta dentro. Per esempio i pari:
+
+#grid(columns: (1fr, 1fr), gutter: 1em, align: horizon,
+  align(center, stack(spacing: 2em,
+    inf($$, $0 in "Pari"$, "Zero"),
+    inf($(n - 2) in "Pari"$, $n in "Pari"$, $"Passo", n >= 2$))),
+  [
+    $ {0} subset.eq "Pari" arrow.r.double {0, 2} subset.eq "Pari" arrow.r.double {0, 2, 4} subset.eq "Pari" arrow.r.double dots $
+    $ "Pari" = {0, 2, 4, 6, dots} $
+    Derivazione di $4 in "Pari"$:
+    #centro(inf(inf(inf($$, $0 in "Pari"$, "Zero"), $2 in "Pari"$, "Passo"), $4 in "Pari"$, "Passo"))
+  ],
+)
+
+Per dimostrare una proprietà di *tutti* gli elementi generati si segue la struttura delle regole: è l'*induzione sulle derivazioni*. Un caso per ogni regola: gli assiomi sono i casi base, le altre regole i passi induttivi.
+
+Proprietà da dimostrare: $P(n) equiv n mod 2 = 0$.
+
+#align(center, table(columns: 2, align: left,
+  [Caso base: regola (Zero)], [Passo induttivo: regola (Passo)],
+  [$P(0)$ vale perché $0 mod 2 = 0$.], [Suppongo $P(n - 2)$ e dimostro $P(n)$. $(n-2) mod 2 = 0$ vuol dire che esiste $k$ con $n - 2 = 2k$. Allora $n = 2k + 2 = 2(k + 1)$: con $k' = k + 1$ ho $n = 2k'$, quindi $n mod 2 = 0$.],
+))
+
+Conclusione: per ogni $n in "Pari"$ vale $n mod 2 = 0$.
+
+== Un linguaggio di espressioni
+
+#block(sticky: true)[Primo caso di studio: un sistema di tipi per un piccolo linguaggio di espressioni con booleani e numeri. Prima la *sintassi*:]
+
+#align(center, box(stroke: 1pt + blu, inset: 12pt, radius: 4pt, grid(columns: 3, column-gutter: 3em, align: left,
+  [*Espressioni* \ $E ::= tt \ quad | space ff \ quad | space "NV" \ quad | space iff E thn E els E \ quad | space succ E \ quad | space pred E \ quad | space isZero E$],
+  [*Valori* \ $V ::= tt \ quad | space ff \ quad | space "NV"$],
+  [*Valori numerici* \ $"NV" ::= 0 | 1 | 2 | dots$],
+)))
+
+I *valori* sono i risultati finali: le espressioni che non vanno più calcolate.
+
+Poi la *semantica*, cioè cosa succede quando un'espressione viene eseguita: un *interprete* scritto con regole di inferenza. Ogni regola dice come fare *un passo* di calcolo $E arrow.r E'$ (semantica _small-step_, a piccoli passi).
+
+#regole([Condizionale], blu,
+  [$iff tt thn E_1 els E_2 arrow.r E_1$ #h(1em) #text(8pt, fill: gray)[(IF-TRUE)] #h(3em) $iff ff thn E_1 els E_2 arrow.r E_2$ #h(1em) #text(8pt, fill: gray)[(IF-FALSE)]],
+  inf($E arrow.r E'$, $iff E thn E_1 els E_2 arrow.r iff E' thn E_1 els E_2$, "IF-COND"))
+
+IF-COND ha la stessa forma delle regole delle strategie: finché la condizione non è un valore, si calcola la condizione. Quando diventa $tt$ o $ff$ scatta IF-TRUE o IF-FALSE.
+
+#regole([Operazioni sui numeri], verde,
+  [#regola($E arrow.r E'$, $succ E arrow.r succ E'$) #h(3em) #regola($m = n + 1$, $succ n arrow.r m$)],
+  [#regola($E arrow.r E'$, $pred E arrow.r pred E'$) #h(2em) $pred 0 arrow.r 0$ #h(2em) #regola($n > 0 quad m = n - 1$, $pred n arrow.r m$)],
+  [#regola($E arrow.r E'$, $isZero E arrow.r isZero E'$) #h(2em) $isZero 0 arrow.r tt$ #h(2em) #regola($n > 0$, $isZero n arrow.r ff$)])
+
+Lo schema è sempre lo stesso: la regola a sinistra calcola l'argomento finché diventa un numero $n$, le altre fanno l'operazione. $pred 0$ dà $0$: non ci sono numeri negativi.
