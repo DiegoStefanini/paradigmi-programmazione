@@ -71,6 +71,7 @@
   box(stroke: 1pt + blu, fill: rgb("#eef4ff"), inset: 10pt, radius: 4pt, text(13pt, f)),
   align(horizon)[→], align(horizon, text(13pt, uscita))))
 // nomi di più lettere usabili nelle formule
+#let (fun, Apply, fix, lett, inn) = ("fun", "Apply", "fix", "let", "in").map(math.op)
 #let (TRUE, FALSE, NOT, AND, OR, IF, SUCC, PLUS, TIMES, ISZERO, Twice, Comp, iff, thn, els, tt, ff, succ, pred, isZero) = ("TRUE", "FALSE", "NOT", "AND", "OR", "IF", "SUCC", "PLUS", "TIMES", "ISZERO", "Twice", "Comp", "if", "then", "else", "true", "false", "succ", "pred", "isZero").map(math.op)
 // regola di inferenza: sopra la riga l'ipotesi, sotto la conclusione
 #let regola(sopra, sotto) = $display(frac(sopra, sotto))$
@@ -622,8 +623,6 @@ Conta quale strategia si sceglie?
 - La CBV valuta ogni argomento *una volta sola*. La CBN lo valuta *solo se serve*, ma può valutarlo più volte: è la strada di sinistra nella figura di $(lambda x. x + x)((lambda y. y) 5)$.
 - La CBN *termina ogni volta che è possibile*; la CBV può non terminare anche quando la CBN termina. In $(lambda x. y) Omega$ la CBN applica subito $lambda x. y$ e dà $y$; la CBV deve prima valutare l'argomento $Omega$ e non finisce mai. Non contraddice la confluenza, che dice che una strada verso il termine comune *esiste*, non quale strategia la trova.
 
-= Programmare nel lambda calcolo
-
 == Funzioni con più argomenti
 
 Nel λ-calcolo ogni funzione prende *un solo argomento*. Una funzione di due argomenti si scrive come *catena* di funzioni di un argomento, come la selezione $lambda x. lambda y. x$: la prima prende $x$ e restituisce una funzione che prende $y$.
@@ -1009,3 +1008,229 @@ IF-COND ha la stessa forma delle regole delle strategie: finché la condizione n
   [#regola($E arrow.r E'$, $isZero E arrow.r isZero E'$) #h(2em) $isZero 0 arrow.r tt$ #h(2em) #regola($n > 0$, $isZero n arrow.r ff$)])
 
 Lo schema è sempre lo stesso: la regola a sinistra calcola l'argomento finché diventa un numero $n$, le altre fanno l'operazione. $pred 0$ dà $0$: non ci sono numeri negativi.
+
+Passo dopo passo, `if isZero 0 then 2 else pred 1` si calcola così:
+
+#centro(stack(spacing: 0.9em,
+  inf($isZero 0 arrow.r tt$, $iff isZero 0 thn 2 els pred 1 arrow.r iff tt thn 2 els pred 1$, "IF-COND"),
+  [$iff tt thn 2 els pred 1 arrow.r 2$ #text(8pt, fill: gray)[ #h(0.5em) (IF-TRUE)]]))
+
+Finora l'interprete sa solo calcolare. Ora gli aggiungiamo i *tipi*: solo due, $"Bool"$ e $"Nat"$ (i numeri).
+
+#align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt)[$T ::= "Bool" | "Nat"$])
+
+Il controllo dei tipi è una relazione fra espressioni e tipi, scritta $E : T$ ("$E$ ha tipo $T$"). È definita da regole di inferenza, una per ogni forma sintattica: il metodo è *sintattico*, per induzione sulla struttura del programma.
+
+#regole([Regole di tipo], blu,
+  [#inf($$, $tt : "Bool"$, "T-TRUE") #h(2em) #inf($$, $ff : "Bool"$, "T-FALSE") #h(2em) #inf($$, $n : "Nat"$, "T-NAT")],
+  [#inf($E : "Bool" quad E_1 : T quad E_2 : T$, $iff E thn E_1 els E_2 : T$, "T-IF")],
+  [#inf($E : "Nat"$, $succ E : "Nat"$, "T-SUCC") #h(1.5em) #inf($E : "Nat"$, $pred E : "Nat"$, "T-PRED") #h(1.5em) #inf($E : "Nat"$, $isZero E : "Bool"$, "T-ISZERO")])
+
+La relazione di tipo è la *più piccola* relazione che soddisfa tutte le istanze di queste regole. Un'espressione $E$ è *ben tipata* (_well-typed_) se esiste un $T$ con $E : T$; altrimenti è _ill-typed_.
+
+*Controllo* ("$E$ ha tipo $T$?"): dati $E$ e $T$ si cerca un *albero di derivazione* fatto di istanze delle regole. Per esempio:
+
+#let tn(t, n) = inf($$, t, n)
+#centro(text(9pt, inf(
+  [#tn($0 : "Nat"$, "T-NAT") #h(0.4em) #inf($0 : "Nat"$, $isZero 0 : "Bool"$, "T-ISZERO") #h(0.4em) #tn($2 : "Nat"$, "T-NAT") #h(0.4em) #inf($1 : "Nat"$, $pred 1 : "Nat"$, "T-PRED")],
+  $iff isZero 0 thn 2 els pred 1 : "Nat"$, "T-IF")))
+
+*Inferenza*: è il problema opposto, data solo $E$ si cerca un $T$ (e la derivazione).
+
+Le regole sono *deterministiche*: per ogni forma sintattica ce n'è una sola, quindi si trasformano subito in un algoritmo che calcola il tipo guardando i tipi delle sottoespressioni:
+
+```
+typeof(E) =
+  E = true | false         →  Bool
+  E = n                    →  Nat
+  E = if E1 then E2 else E3
+      →  T1 = typeof(E1), T2 = typeof(E2), T3 = typeof(E3);
+         se T1 = Bool e T2 = T3 allora T2, altrimenti errore
+  E = succ E1 | pred E1    →  se typeof(E1) = Nat allora Nat, altrimenti errore
+  E = isZero E1            →  se typeof(E1) = Nat allora Bool, altrimenti errore
+```
+
+Il tipo di un'espressione dipende solo dai tipi delle sue parti: è la *composizionalità*. Per questo T-IF vuole i due rami dello *stesso* tipo $T$, che diventa il tipo di tutto l'`if`: chi usa quell'`if` deve sapere un tipo preciso. Per esempio l'argomento di $pred$ deve essere $"Nat"$ e la condizione di un `if` deve essere $"Bool"$.
+
+#nota[I sistemi di tipo sono *imprecisi*: danno un'approssimazione prudente che considera tutte le esecuzioni possibili, e anche qualcuna impossibile. $iff tt thn 0 els ff$ dà sicuramente un numero, ma non ha tipo: T-IF considera anche il ramo `else`, che a runtime non verrebbe mai eseguito, e $"Nat" != "Bool"$.]
+
+== Type safety
+
+Un sistema di tipi è *corretto* (_type safe_, _sound_) se vale ciò che promette Milner: i programmi ben tipati non "vanno storti". Si traduce in due proprietà, da dimostrare entrambe:
+
+#align(center, block(breakable: false, table(columns: 2, align: left,
+  [Proprietà], [Cosa dice],
+  [*Progresso*: se $E : T$ allora $E$ è un valore oppure $E arrow.r E'$ per qualche $E'$], [un'espressione ben tipata *non si blocca* durante l'esecuzione: o ha finito, o può fare un passo],
+  [*Conservazione*: se $E : T$ e $E arrow.r E'$ allora $E' : T$], [le regole di esecuzione *preservano il tipo*: dopo un passo l'espressione resta ben tipata, con lo stesso tipo],
+)))
+
+Insieme garantiscono che l'esecuzione di un'espressione ben tipata non si blocca mai su un tipo sbagliato.
+
+#nota[Senza tipi può succedere che l'espressione non sia un valore e non esista nessuna regola per proseguire: $iff 0 thn 2 els 1$ resta bloccata, perché la condizione non è né $tt$ né $ff$. Il progresso dice che con i tipi non capita.]
+
+Per la conservazione, esempio sull'albero visto prima: $iff isZero 0 thn 2 els pred 1 : "Nat"$ fa un passo e diventa $iff tt thn 2 els pred 1$, che ha ancora tipo $"Nat"$ (T-TRUE, $2 : "Nat"$ e $pred 1 : "Nat"$ danno T-IF). Poi diventa $2 : "Nat"$.
+
+Le dimostrazioni sono per *induzione sulla derivazione di $E : T$*: un caso per ogni regola di tipo. Si mostra il caso dell'`if` (gli altri sono analoghi).
+
+*Progresso.* Casi base (T-TRUE, T-FALSE, T-NAT): $E$ è già un valore. Caso $E = iff E_1 thn E_2 els E_3$: per T-IF vale $E_1 : "Bool"$. Per ipotesi induttiva (a) $E_1$ è un valore, quindi $tt$ o $ff$, e scatta IF-TRUE o IF-FALSE; oppure (b) $E_1 arrow.r E_1'$, e scatta IF-COND. In ogni caso $E$ fa un passo.
+
+*Conservazione.* Casi base: $E$ è un valore, non si riduce, la tesi è vera. Caso $E = iff E_1 thn E_2 els E_3 : T$: per T-IF vale $E_1 : "Bool"$, $E_2 : T$, $E_3 : T$. Il passo $E arrow.r E'$ può venire da tre regole:
++ IF-TRUE: $E' = E_2$, che ha tipo $T$;
++ IF-FALSE: $E' = E_3$, che ha tipo $T$;
++ IF-COND con $E_1 arrow.r E_1'$: per ipotesi induttiva $E_1' : "Bool"$, quindi con T-IF anche $iff E_1' thn E_2 els E_3 : T$.
+
+= Il lambda calcolo tipato
+
+== Tipi e regole di tipo
+
+Il λ-calcolo "puro" non ha tipi. Qui lo rendiamo tipato, partendo da un solo tipo di base, i booleani, più il tipo delle funzioni:
+
+#align(center, box(stroke: 1pt + blu, inset: 10pt, radius: 4pt)[$tau ::= "Bool" | tau arrow.r tau$])
+
+Esempi di tipi: $"Bool"$, $"Bool" arrow.r "Bool"$, $("Bool" arrow.r "Bool") arrow.r "Bool"$. La freccia *associa a destra*: $"Bool" arrow.r "Bool" arrow.r "Bool"$ sta per $"Bool" arrow.r ("Bool" arrow.r "Bool")$. Un tipo $tau_1 arrow.r tau_2$ è quello delle funzioni che prendono un argomento di tipo $tau_1$ e restituiscono un risultato di tipo $tau_2$.
+
+Il linguaggio, che chiamiamo *FUN*, ha il parametro con il suo tipo (nel formato tradizionale: $lambda x : tau . e$):
+
+#align(center, box(stroke: 1pt + blu, inset: 12pt, radius: 4pt, grid(columns: 2, column-gutter: 3em, align: left,
+  [*Espressioni* \ $e ::= x$ #text(8pt, fill: gray)[variabile] \ $quad | space fun x : tau = e$ #text(8pt, fill: gray)[funzione] \ $quad | space Apply(e, e)$ #text(8pt, fill: gray)[applicazione] \ $quad | space tt | ff$ \ $quad | space iff e thn e els e$],
+  [*Valori* \ $v ::= fun x : tau = e$ \ $quad | space tt | ff$ \ \ #text(9pt)[Il condizionale è un'*espressione*, non un comando: i due rami contengono espressioni.]],
+)))
+
+La semantica è quella già vista, riscritta con la nuova sintassi (sostituzione che evita la cattura). Per l'applicazione si usa *call-by-value*: prima si calcola la funzione, poi l'argomento, poi si fa la β-riduzione.
+
+#regole([Semantica], verde,
+  [$Apply(fun x : tau = e_1, v_2) arrow.r e_1 {x := v_2}$ #h(1em) #text(8pt, fill: gray)[(β-riduzione)]],
+  [#regola($e_1 arrow.r e_1'$, $Apply(e_1, e_2) arrow.r Apply(e_1', e_2)$) #h(3em) #regola($e_2 arrow.r e_2'$, $Apply(v_1, e_2) arrow.r Apply(v_1, e_2')$)],
+  [#regola($e arrow.r e'$, $iff e thn e_1 els e_2 arrow.r iff e' thn e_1 els e_2$) #h(2em) $iff tt thn e_1 els e_2 arrow.r e_1$ #h(2em) $iff ff thn e_1 els e_2 arrow.r e_2$])
+
+*Il problema di tipare le funzioni.* Per dare un tipo a $fun x : tau_1 = e$ ci aspettiamo $tau_1 arrow.r tau_2$, dove $tau_2$ è il tipo del corpo $e$. Ma il tipo di $e$ dipende dal tipo di $x$, che si decide nella funzione. Serve ricordare i tipi delle variabili: l'*ambiente dei tipi* $Gamma$, una funzione che associa nomi a tipi.
+
+$ Gamma = x_1 : tau_1, x_2 : tau_2, dots, x_k : tau_k quad "significa" quad Gamma(x_i) = tau_i $
+
+$Gamma, x : tau$ è $Gamma$ estesa con $x : tau$: vale $tau$ per $x$, e $Gamma(y)$ per ogni $y != x$. L'ambiente vuoto $emptyset$ non lega nessuna variabile. Esempio con $Gamma = x : tau, y : tau'$:
+
+#align(center, table(columns: 3, align: center,
+  [$Gamma(x)$], [$Gamma(z)$], [$(Gamma, z : tau_2)(z)$],
+  [$tau$], [indefinito], [$tau_2$],
+))
+
+Il controllo dei tipi diventa una relazione a *tre posti*, il *giudizio di tipo*:
+
+$ Gamma tack.r e : tau $
+
+"nell'ambiente $Gamma$, l'espressione $e$ ha tipo $tau$". Nel linguaggio dei compilatori l'ambiente dei tipi è la *tabella dei simboli* (_symbol table_); le regole le applica il compilatore durante l'analisi statica.
+
+#regole([Regole di tipo di FUN], blu,
+  [#inf($$, $Gamma tack.r tt : "Bool"$, "T-TRUE") #h(2em) #inf($$, $Gamma tack.r ff : "Bool"$, "T-FALSE") #h(2em) #inf($Gamma(x) = tau$, $Gamma tack.r x : tau$, "T-VAR")],
+  [#inf($Gamma tack.r e : "Bool" quad Gamma tack.r e_1 : tau quad Gamma tack.r e_2 : tau$, $Gamma tack.r iff e thn e_1 els e_2 : tau$, "T-IF")],
+  [#inf($Gamma, x : tau_1 tack.r e : tau_2$, $Gamma tack.r fun x : tau_1 = e : tau_1 arrow.r tau_2$, "T-FUN")],
+  [#inf($Gamma tack.r e_1 : tau_1 arrow.r tau_2 quad Gamma tack.r e_2 : tau_1$, $Gamma tack.r Apply(e_1, e_2) : tau_2$, "T-APPLY")])
+
+- *T-VAR*: una variabile ha il tipo che le dà l'ambiente.
+- *T-IF*: i rami hanno lo stesso tipo $tau$, che può essere anche un tipo funzione: si possono avere condizionali i cui rami sono funzioni.
+- *T-FUN*: il parametro $x$ è dichiarato con il suo tipo $tau_1$; per tipare il corpo si usa $Gamma, x : tau_1$. Questa dichiarazione *sovrascrive* eventuali dichiarazioni precedenti di $x$ e vale solo nel corpo (è il suo _scope_). Il risultato è il tipo del corpo.
+- *T-APPLY*: se $e_1$ trasforma argomenti di tipo $tau_1$ in risultati di tipo $tau_2$ e $e_2$ ha tipo $tau_1$, il risultato è di tipo $tau_2$.
+
+Esempio: $emptyset tack.r fun x : "Bool" = x : "Bool" arrow.r "Bool"$, perché $emptyset, x : "Bool" tack.r x : "Bool"$.
+
+#par(justify: false)[Esempio più grande: $lambda f. f (iff ff thn tt els ff)$, cioè $fun f : "Bool" arrow.r "Bool" = Apply(f, e_0)$ con $e_0 = iff ff thn tt els ff$. Sia $Gamma_f = emptyset, f : "Bool" arrow.r "Bool"$.]
+
+#let B = "Bool"
+#centro(text(8pt, inf(
+  inf(
+    [#inf($Gamma_f (f) = B arrow.r B$, $Gamma_f tack.r f : B arrow.r B$, "T-VAR") #h(1.2em) #inf($Gamma_f tack.r ff : B quad Gamma_f tack.r tt : B quad Gamma_f tack.r ff : B$, $Gamma_f tack.r e_0 : B$, "T-IF")],
+    $Gamma_f tack.r Apply(f, e_0) : B$, "T-APPLY"),
+  $emptyset tack.r fun f : B arrow.r B = Apply(f, e_0) : (B arrow.r B) arrow.r B$, "T-FUN")))
+
+== Type safety nel λ-calcolo tipato
+
+Le due proprietà valgono anche qui, con una condizione sul progresso: l'espressione deve essere *chiusa* (nessuna variabile libera), cioè tipata nell'ambiente vuoto.
+
+#align(center, block(breakable: false, table(columns: 2, align: left,
+  [Proprietà], [Cosa dice],
+  [*Progresso*: se $emptyset tack.r e : tau$ allora $e$ è un valore oppure $e arrow.r e'$], [un'espressione chiusa e ben tipata non si blocca],
+  [*Conservazione*: se $Gamma tack.r e : tau$ e $e arrow.r e'$ allora $Gamma tack.r e' : tau$], [un passo di esecuzione preserva il tipo],
+)))
+
+Si dimostrano ancora per induzione sulle derivazioni di tipo.
+
+*Progresso.* Costanti booleane: come prima. Variabili: caso banale, perché nell'ambiente vuoto una variabile non ha tipo. Astrazione: è già un valore. Applicazione $e = Apply(e_1, e_2)$ con $emptyset tack.r e_1 : tau_1 arrow.r tau_2$ e $emptyset tack.r e_2 : tau_1$: per ipotesi induttiva $e_1$ e $e_2$ sono valori o possono fare un passo.
+- Se $e_1$ fa un passo, $e$ fa un passo (prima regola dell'applicazione).
+- Se $e_1$ è un valore e $e_2$ fa un passo, $e$ fa un passo (seconda regola).
+- Se sono entrambi valori, $e_1$ ha tipo funzione, quindi è $fun x : tau_1 = e_3$, e $e$ fa un passo con la β-riduzione.
+
+*Conservazione.* Il caso difficile è l'applicazione $e = Apply(fun x : tau_1 = e_3, e_2)$ con $e_2$ valore, che si riduce a $e' = e_3 {x := e_2}$. Dal tipo di $e$ si ricava $Gamma, x : tau_1 tack.r e_3 : tau_2$ e $Gamma tack.r e_2 : tau_1$, e bisogna dimostrare $Gamma tack.r e_3 {x := e_2} : tau_2$. Ma abbiamo tipato $e_3$ e non $e_3 {x := e_2}$: ci vuole un lemma che dica che la sostituzione non cambia il tipo.
+
+#nota[*Lemma di sostituzione*: se $Gamma, x : tau_1 tack.r e : tau$ e $Gamma tack.r e_1 : tau_1$ allora $Gamma tack.r e {x := e_1} : tau$. Sostituire un parametro formale con un parametro attuale dello *stesso tipo* conserva il tipo. Esempio: se $iff x thn e_1 els e_2 : "Bool"$ nell'ipotesi $x : "Bool"$, allora anche $(iff x thn e_1 els e_2) {x := tt} : "Bool"$. Si dimostra per induzione sulla derivazione di $Gamma, x : tau_1 tack.r e : tau$; i casi interessanti sono variabili e astrazioni.]
+
+== Estensioni e ricorsione
+
+Si può estendere FUN per farlo diventare un vero linguaggio di programmazione. Con le costanti numeriche $n$ (tipo $"Nat"$) e le operazioni binarie $e_1 plus.o e_2$ (con $plus.o in {"+", "-", "*", "/", "%"}$, di tipo noto $tau_1 times tau_2 arrow.r tau$):
+
+#centro(grid(columns: 2, gutter: 3em, align: bottom,
+  inf($$, $Gamma tack.r n : "Nat"$, "T-NUM"),
+  inf($Gamma tack.r e_1 : tau_1 quad Gamma tack.r e_2 : tau_2 quad plus.o : tau_1 times tau_2 arrow.r tau$, $Gamma tack.r e_1 plus.o e_2 : tau$, "T-OP")))
+
+Si aggiungono anche le *dichiarazioni locali* $"let" x = e_1 "in" e_2$. Si calcola prima $e_1$; quando è un valore $v$ lo si sostituisce a $x$ in $e_2$. Il tipo di $x$ è quello di $e_1$, e vale solo in $e_2$:
+
+#regole([Dichiarazioni locali], verde,
+  [#regola($e_1 arrow.r e_1'$, $lett x = e_1 inn e_2 arrow.r lett x = e_1' inn e_2$) #h(3em) $lett x = v inn e_2 arrow.r e_2 {x := v}$],
+  [#inf($Gamma tack.r e_1 : tau_1 quad Gamma, x : tau_1 tack.r e_2 : tau_2$, $Gamma tack.r lett x = e_1 inn e_2 : tau_2$, "T-LET")])
+
+*Ricorsione.* Nel λ-calcolo tipato semplice tutti i programmi tipabili *terminano*. Quindi $Omega = (lambda x. x x)(lambda x. x x)$ e il combinatore $Y$ *non sono tipabili*. Il motivo è l'auto-applicazione $x x$:
+
+#centro(inf($Gamma tack.r x : tau_1 arrow.r tau_2 quad Gamma tack.r x : tau_1$, $Gamma tack.r Apply(x, x) : tau_2$, "T-APPLY"))
+
+$x$ ha un solo tipo, quindi servirebbe $tau_1 = tau_1 arrow.r tau_2$, che è impossibile. Per avere la ricorsione bisogna aggiungere al linguaggio un costrutto apposta, tipabile e con le proprietà che vogliamo.
+
+Si parte da un esempio. Il fattoriale è il *punto fisso* della funzione $G$, che prende l'approssimazione $f$ del fattoriale e ne costruisce una migliore:
+
+$ G = fun f : "Nat" arrow.r "Nat" = fun n : "Nat" = iff isZero n thn 1 els n * f(pred n) $
+$ G : ("Nat" arrow.r "Nat") arrow.r "Nat" arrow.r "Nat" $
+
+Il costrutto $fix e$ calcola questo punto fisso, e si scrive $"fact" = fix G$.
+
+#regole([Il costrutto fix], blu,
+  [#regola($e arrow.r e'$, $fix e arrow.r fix e'$) #h(3em) $fix (fun f : tau = e) arrow.r e {f := fix (fun f : tau = e)}$],
+  [#inf($Gamma tack.r e : tau arrow.r tau$, $Gamma tack.r fix e : tau$, "T-FIX")])
+
+La regola di valutazione "srotola" una volta la ricorsione: il corpo $e$ viene eseguito con $f$ sostituita da $fix$ di sé stesso, così alla prossima chiamata ricorsiva si srotola ancora. Per $"fact" 3 = (fix G) 3$:
+
+$ (fix G) 3 arrow.r (fun n : "Nat" = iff isZero n thn 1 els n * (fix G)(pred n)) 3 arrow.r^* 3 * (fix G)(pred 3) $
+
+Il λ-calcolo tipato semplice con $fix$ si chiama *PCF* (_Programming Computable Functions_), un linguaggio funzionale tipato introdotto da Gordon Plotkin nel 1977.
+
+Per scrivere meno c'è lo zucchero sintattico $lett "rec" x : tau = e inn e'$, che sta per $lett x = fix (fun x : tau = e) inn e'$. In OCaml ci sono due primitive: `fun` per le funzioni non ricorsive e `let rec` per quelle ricorsive.
+
+```ocaml
+let plusOne = fun x -> x + 1;;
+let rec fact x = if x <= 1 then 1 else x * fact (x - 1)
+```
+
+== Cosa possono garantire i tipi
+
+Con PCF il percorso sui tipi è completo, e resta da capire a cosa serve. Il λ-calcolo è un *modello in piccolo* dei linguaggi: sistemi di tipi, terminazione e verifica si studiano qui, dove le regole sono poche, e poi si portano ai linguaggi veri.
+
+Un tipo è una *specifica di comportamento*: $tau_1 arrow.r tau_2$ dice che la funzione prende un $tau_1$ e restituisce un $tau_2$, e il type checking controlla che il programma rispetti questa specifica. Con tipi più ricchi si controllano anche altre proprietà, per esempio la segretezza e l'autenticità nei protocolli di sicurezza, o l'assenza di deadlock (processi bloccati ad aspettarsi a vicenda) nei sistemi concorrenti.
+
+La garanzia però è solo *parziale*, per un limite che non si può aggirare. Le domande interessanti su un programma (termina su tutti gli input? quanto può crescere la memoria dinamica? lascia uscire informazioni private?) riguardano cosa fa quando gira, e il *teorema di Rice* (1953) dice che *nessuna proprietà non banale del comportamento di un programma è decidibile*: non esiste un algoritmo che risponda sempre giusto ("non banale" vuol dire vera per alcuni programmi e falsa per altri). Non basta nemmeno eseguire il programma e guardare, perché non c'è un limite al tempo che può impiegare.
+
+Si esce dal problema *approssimando*: al posto della proprietà esatta se ne controlla una più prudente, che è decidibile. Un sistema di tipi fa proprio questo, e l'approssimazione deve rispettare i comportamenti veri: valgono progresso e conservazione, quindi un programma accettato non dà mai errori di tipo. Il prezzo è che qualche programma corretto viene rifiutato. Nel disegno ogni ovale è un insieme di programmi: i ben tipati stanno tutti dentro quelli senza errori di tipo (è la type safety), ma non li riempiono.
+
+#centro(canvas(length: 1cm, {
+  import draw: *
+  circle((0, 0), radius: (5.2, 2.1), stroke: 0.8pt + verde, fill: rgb("#eefaf2"))
+  circle((-1.9, -0.2), radius: (2.6, 1.3), stroke: 0.8pt + blu, fill: rgb("#eef4ff"))
+  content((0, 1.65), text(9pt, fill: verde)[programmi che non danno errori di tipo])
+  content((-1.9, 0.5), text(9pt, fill: blu)[programmi ben tipati])
+  circle((-1.9, -0.45), radius: 0.07, fill: black)
+  content((-1.9, -0.85), text(9pt, $iff tt thn 1 els 0$))
+  circle((2.6, -0.2), radius: 0.07, fill: black)
+  content((2.6, -0.6), text(9pt, $iff tt thn 0 els ff$))
+  circle((6.3, 0), radius: 0.07, fill: red)
+  content((6.3, -0.4), text(9pt, fill: red, $succ tt$))
+}))
+
+Il punto rosso sta fuori da tutto: $succ tt$ si blocca, e il type checker lo rifiuta giustamente. $iff tt thn 0 els ff$ invece non dà errori, ma viene rifiutato lo stesso.
+
+Su questa idea sono costruiti gli *analizzatori statici* usati nell'industria, che controllano il codice senza eseguirlo: per esempio Infer, FlowDroid e Roslyn Code Analyzer.
