@@ -636,7 +636,7 @@ Le strategie si scrivono con *regole*: sopra la riga l'ipotesi, sotto la conclus
   rg(2, ax($(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$, "CN-App"), inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "CN-App-1")))
 
 - *Standard*: qualsiasi redex si può ridurre in qualsiasi momento, anche dentro il corpo di una funzione (App-Body). Non è deterministica.
-- *Call-by-value*: $v$ sta per un *valore*, cioè un'espressione che non si può più ridurre (una funzione, ma anche una variabile libera come $y$). La β-riduzione scatta solo quando l'argomento è un valore $v_2$; l'argomento $e_2$ si riduce solo quando la funzione è già un valore $v_1$.
+- *Call-by-value*: $v$ sta per un *valore*, cioè un'espressione che non si può più ridurre: una funzione, ma anche una variabile libera come $y$ o un'applicazione bloccata come $x y$. La β-riduzione scatta solo quando l'argomento è un valore $v_2$; l'argomento $e_2$ si riduce solo quando la funzione è già un valore $v_1$.
 - *Call-by-name*: si riduce la parte funzione finché diventa $lambda x. e_1$, poi si applica. L'argomento non si tocca.
 
 #nota[CBV e CBN *non hanno la regola che riduce il corpo di una funzione*. Quindi $lambda x. ((lambda y. y) z)$ con la riduzione standard diventa $lambda x. z$, con le due strategie resta così com'è: per loro una funzione è già un valore, anche se dentro ha un redex. È quello che succede nei linguaggi: il corpo di una funzione non viene eseguito finché la funzione non viene chiamata.]
@@ -1174,7 +1174,7 @@ Il linguaggio, che chiamiamo *FUN*, ha il parametro con il suo tipo (nel formato
   [*Valori* \ $v ::= fun x : tau = e$ \ $quad | space tt | ff$ \ \ #text(9pt)[Il condizionale è un'*espressione*, non un comando: i due rami contengono espressioni.]],
 )))
 
-La semantica è quella già vista, riscritta con la nuova sintassi (sostituzione che evita la cattura). Per l'applicazione si usa *call-by-value*: prima si calcola la funzione, poi l'argomento, poi si fa la β-riduzione.
+La semantica è quella già vista, riscritta con la nuova sintassi (sostituzione che evita la cattura). If-Cond si trova anche con il nome IF-Eval. Per l'applicazione si usa *call-by-value*: prima si calcola la funzione, poi l'argomento, poi si fa la β-riduzione.
 
 #regole([Semantica], verde,
   [#ax($Apply(fun x : tau = e_1, v_2) arrow.r e_1 {x := v_2}$, "App")],
@@ -1217,7 +1217,7 @@ Esempio: $emptyset tack.r fun x : "Bool" = x : "Bool" arrow.r "Bool"$, perché $
 #let B = "Bool"
 #centro(text(8pt, inf(
   inf(
-    [#inf($Gamma_f (f) = B arrow.r B$, $Gamma_f tack.r f : B arrow.r B$, "T-Var") #h(1.2em) #inf($Gamma_f tack.r ff : B quad Gamma_f tack.r tt : B quad Gamma_f tack.r ff : B$, $Gamma_f tack.r e_0 : B$, "T-If")],
+    [#inf($$, $Gamma_f tack.r f : B arrow.r B$, "T-Var") #h(1.2em) #inf($Gamma_f tack.r ff : B quad Gamma_f tack.r tt : B quad Gamma_f tack.r ff : B$, $Gamma_f tack.r e_0 : B$, "T-If")],
     $Gamma_f tack.r Apply(f, e_0) : B$, "T-App"),
   $emptyset tack.r fun f : B arrow.r B = Apply(f, e_0) : (B arrow.r B) arrow.r B$, "T-Fun")))
 
@@ -1420,8 +1420,8 @@ Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è 
 ]
 
 #soluzione(5)[
-  a. Un solo redex, $(lambda x. lambda y. x y)(lambda z. z y)$. Sostituendo, la $y$ di $lambda z. z y$ verrebbe catturata da $lambda y$: rinomino in $a$. Poi ci sono due redex, e tutte e due le strade arrivano a $y y$:
-  $ (lambda x. lambda y. x y)(lambda z. z y) y arrow.r (lambda a. (lambda z. z y) a) y #h(1em) cases(arrow.r (lambda z. z y) y arrow.r y y & "(prima l'esterno)", arrow.r (lambda a. a y) y arrow.r y y & "(prima l'interno " (lambda z. z y) a ")") $
+  a. Un solo redex, $(lambda x. lambda y. x y)(lambda z. z y)$. Sostituendo, la $y$ di $lambda z. z y$ verrebbe catturata da $lambda y$: rinomino in $a$. Poi ci sono due redex: sopra si riduce prima quello esterno, sotto prima quello interno $(lambda z. z y) a$. Tutte e due le strade arrivano a $y y$:
+  $ (lambda x. lambda y. x y)(lambda z. z y) y arrow.r (lambda a. (lambda z. z y) a) y #h(1em) cases(arrow.r (lambda z. z y) y arrow.r y y, arrow.r (lambda a. a y) y arrow.r y y) $
 
   b. Stessa forma: la $y$ di $lambda x. y y$ va protetta. $(lambda x. lambda y. x y)(lambda x. y y) k arrow.r (lambda a. (lambda x. y y) a) k$, poi $arrow.r (lambda x. y y) k arrow.r y y$ oppure $arrow.r (lambda a. y y) k arrow.r y y$. Forma normale $y y$.
 
@@ -1447,17 +1447,21 @@ Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è 
   d. *CBN*: $arrow.r y$. *CBV*: deve prima valutare l'argomento $(lambda y. y y y)(lambda x. x x x)$, che cresce all'infinito: *non termina*. È l'esempio di una CBN che termina dove la CBV no.
 
   e. L'argomento $lambda z. z z$ è un valore, quindi le due strategie fanno gli stessi passi della strada "prima l'esterno": arrivano a $(lambda z. z z)(lambda z. z z)$ e *non terminano*.
+
+  #nota[In a, b, c la CBV tratta come valori $y$, $k$ e $x y$, che non si riducono più. Se invece per valore si intende solo una funzione $lambda x. e$, la CBV si ferma prima: in a a $(lambda a. (lambda z. z y) a) y$, in b a $(lambda a. (lambda x. y y) a) k$, in c non fa nessun passo.]
 ]
 
 #soluzione(7)[
-  $ IF FALSE e_1 e_2 &= (lambda c. lambda "then". lambda "else". c "then" "else") FALSE e_1 e_2 arrow.r (lambda "then". lambda "else". FALSE "then" "else") e_1 e_2 \
+  $ IF FALSE e_1 e_2 &= (lambda c. lambda "then". lambda "else". c "then" "else") FALSE e_1 e_2 \
+  &arrow.r (lambda "then". lambda "else". FALSE "then" "else") e_1 e_2 \
   &arrow.r (lambda "else". FALSE e_1 "else") e_2 arrow.r FALSE e_1 e_2 = (lambda t. lambda f. f) e_1 e_2 arrow.r (lambda f. f) e_2 arrow.r e_2 $
 ]
 
 #soluzione(8)[
   $C_n s z$ applica $s$ a $z$ per $n$ volte. Se $z = TRUE$ e $s$ è la funzione che restituisce sempre $FALSE$, il risultato è $TRUE$ solo se $s$ non viene mai applicata, cioè se $n = 0$:
   $ ISZERO = lambda n. n (lambda x. FALSE) TRUE $
-  $ ISZERO C_1 arrow.r C_1 (lambda x. FALSE) TRUE = (lambda s. lambda z. s z)(lambda x. FALSE) TRUE arrow.r (lambda z. (lambda x. FALSE) z) TRUE arrow.r (lambda x. FALSE) TRUE arrow.r FALSE $
+  $ ISZERO C_1 &arrow.r C_1 (lambda x. FALSE) TRUE = (lambda s. lambda z. s z)(lambda x. FALSE) TRUE \
+  &arrow.r (lambda z. (lambda x. FALSE) z) TRUE arrow.r (lambda x. FALSE) TRUE arrow.r FALSE $
   Controllo con $C_0$: $ISZERO C_0 arrow.r C_0 (lambda x. FALSE) TRUE = (lambda s. lambda z. z)(lambda x. FALSE) TRUE arrow.r (lambda z. z) TRUE arrow.r TRUE$.
 ]
 
@@ -1498,7 +1502,7 @@ Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è 
   b. *Non tipabile*. Per T-Fun bisogna tipare il corpo con $x : "Bool"$, cioè $x : B tack.r Apply(x, tt)$. T-App vuole che $x$ abbia un tipo funzione $tau_1 arrow.r tau_2$, ma $Gamma(x) = "Bool"$. Valutazione: $ff$ è un valore, quindi $arrow.r Apply(x, tt){x := ff} = Apply(ff, tt)$, e qui è *bloccato*: non si applica App ($ff$ non è una funzione) né App-1 o App-2 ($ff$ e $tt$ non fanno passi).
 
   c. *Ben tipato*, $(B arrow.r B) arrow.r B$. Con $Gamma = f : B arrow.r B$:
-  #centro(text(9pt, inf(inf([#inf($Gamma(f) = B arrow.r B$, $Gamma tack.r f : B arrow.r B$, "T-Var") #h(1em) #ax($Gamma tack.r tt : B$, "T-True")], $Gamma tack.r Apply(f, tt) : B$, "T-App"), $emptyset tack.r fun f : B arrow.r B = Apply(f, tt) : (B arrow.r B) arrow.r B$, "T-Fun")))
+  #centro(text(9pt, inf(inf([#inf($$, $Gamma tack.r f : B arrow.r B$, "T-Var") #h(1em) #ax($Gamma tack.r tt : B$, "T-True")], $Gamma tack.r Apply(f, tt) : B$, "T-App"), $emptyset tack.r fun f : B arrow.r B = Apply(f, tt) : (B arrow.r B) arrow.r B$, "T-Fun")))
   Valutazione: è una funzione, quindi è già un valore. Zero passi.
 
   d. *Ben tipato*, $B arrow.r B$. Con $Gamma = f : B arrow.r B, x : B$, prima la funzione (chiamo $(star)$ la sua derivazione):
