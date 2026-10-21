@@ -6,7 +6,9 @@
 #set par(justify: true)
 #set heading(numbering: "1.1")
 #show heading.where(level: 1): it => { pagebreak(weak: true); it }
-#show raw.where(block: true): block.with(fill: luma(245), inset: 8pt, radius: 4pt, width: 100%)
+#show raw.where(block: true): block.with(fill: luma(245), inset: 8pt, radius: 4pt, width: 100%, breakable: false)
+#show table: it => block(breakable: false, it)
+#show grid: it => block(breakable: false, it)
 #show raw.where(block: false): box.with(fill: luma(240), inset: (x: 3pt), outset: (y: 3pt), radius: 2pt)
 #set table(stroke: 0.5pt + luma(180), inset: 6pt)
 #show table.cell.where(y: 0): strong
@@ -665,6 +667,8 @@ Conta quale strategia si sceglie?
 - La CBV valuta ogni argomento *una volta sola*. La CBN lo valuta *solo se serve*, ma può valutarlo più volte: è la strada di sinistra nella figura di $(lambda x. x + x)((lambda y. y) 5)$.
 - La CBN *termina ogni volta che è possibile*; la CBV può non terminare anche quando la CBN termina. In $(lambda x. y) Omega$ la CBN applica subito $lambda x. y$ e dà $y$; la CBV deve prima valutare l'argomento $Omega$ e non finisce mai. Non contraddice la confluenza, che dice che una strada verso il termine comune *esiste*, non quale strategia la trova.
 
+#nota[Esiste anche la *call-by-need*, una variante della CBN: l'argomento si passa senza valutarlo, ma la prima volta che serve si valuta e il risultato si memorizza, così le altre occorrenze lo riusano. Termina negli stessi casi della CBN ed evita le valutazioni ripetute (è la valutazione _lazy_ di Haskell); non la tratteremo in dettaglio.]
+
 #esercizio(5)[Ridurre fino alla forma normale, o accorgersi che la riduzione non termina. A ogni passo indicare il redex scelto; se ci sono più scelte, provarle tutte. \
   a. $(lambda x. lambda y. x y)(lambda z. z y) y$ \
   b. $(lambda x. lambda y. x y)(lambda x. y y) k$ \
@@ -674,7 +678,7 @@ Conta quale strategia si sceglie?
 
 #esercizio(6)[Ripetere l'esercizio 5 con call-by-value e con call-by-name.]
 
-== Funzioni con più argomenti
+== Funzioni con più argomenti <currying>
 
 Nel λ-calcolo ogni funzione prende *un solo argomento*. Una funzione di due argomenti si scrive come *catena* di funzioni di un argomento, come la selezione $lambda x. lambda y. x$: la prima prende $x$ e restituisce una funzione che prende $y$.
 
@@ -1250,7 +1254,7 @@ Si dimostrano ancora per induzione sulle derivazioni di tipo.
 
 Sostituire il parametro formale con un parametro attuale dello *stesso tipo* conserva il tipo. Esempio: con $x : "Bool"$ vale $iff x thn ff els tt : "Bool"$, quindi anche $(iff x thn ff els tt){x := tt} = iff tt thn ff els tt : "Bool"$. Il lemma si dimostra per induzione sulla derivazione di $Gamma, x : tau_1 tack.r e_3 : tau_2$; i casi interessanti sono variabili e astrazioni. Con il lemma la conservazione è dimostrata: è proprio $Gamma tack.r e' : tau_2$.
 
-== Estensioni e ricorsione
+== Estensioni e ricorsione <fix>
 
 Si può estendere FUN per farlo diventare un vero linguaggio di programmazione. Con le costanti numeriche $n$ (tipo $"Nat"$) e le operazioni binarie $e_1 plus.o e_2$ (con $plus.o in {"+", "-", "*", "/", "%"}$, di tipo noto $tau_1 times tau_2 arrow.r tau$):
 
@@ -1326,6 +1330,910 @@ Il punto rosso sta fuori da tutto: $succ tt$ si blocca, e il type checker lo rif
 
 Su questa idea sono costruiti gli *analizzatori statici* usati nell'industria, che controllano il codice senza eseguirlo: per esempio Infer, FlowDroid e Roslyn Code Analyzer.
 
+= OCaml: espressioni, funzioni e tipi
+
+#obiettivi(
+  [leggere la risposta del toplevel: nome legato, tipo, valore],
+  [tradurre un λ-termine in OCaml e scrivere funzioni con `fun`, `let`, `let ... in`, `let rec`],
+  [distinguere una funzione curried da una che prende una coppia, e usare l'applicazione parziale],
+  [ricavare a mano il tipo di una funzione con il metodo dei vincoli, anche quando è polimorfo (`'a`)],
+)
+
+== Il toplevel e i tipi di base
+
+Dopo il modello, il linguaggio. *OCaml* (INRIA, 1996) discende da *ML* (Robin Milner, 1972), il linguaggio funzionale di riferimento: fortemente tipato, con funzioni come valori, variabili immutabili, polimorfismo e pattern matching, e con la *type inference* (il compilatore deduce i tipi da solo). In mezzo c'è *Caml*, che ha aggiunto un'implementazione efficiente e i moduli; OCaml aggiunge gli oggetti. F\# di Microsoft è una variante di OCaml. Lo studiamo perché mostra il paradigma funzionale fatto bene, perché molti linguaggi moderni ne stanno copiando dei pezzi, e perché si presta a scrivere interpreti: lo useremo per implementare linguaggi di paradigmi diversi.
+
+Per provare il codice si usa il *toplevel*, un *REPL* (_Read-Eval-Print Loop_): legge un'espressione, la compila, la valuta e stampa tipo e risultato. Si apre con `ocaml` da terminale, oppure con `utop`, con l'interprete online try.ocamlpro.com o con il notebook Jupyter del corso. Il toplevel `ocaml` valuta solo quando trova `;;`, che chiude l'input; nel notebook `;;` serve solo per separare più espressioni nella stessa cella. Negli esempi la risposta del toplevel è scritta come commento, fra `(*` e `*)`.
+
+```ocaml
+let x = 42;;   (* val x : int = 42 *)
+x + 5;;        (* - : int = 47 *)
+```
+
+#align(center, table(columns: 4, align: left,
+  [Risposta], [Prima di `:`], [Fra `:` e `=`], [Dopo `=`],
+  [`val x : int = 42`], [`val x`: è nato il nome `x`], [il tipo: `int`], [il valore: `42`],
+  [`- : int = 47`], [`-`: nessun nome nuovo], [il tipo: `int`], [il valore: `47`],
+))
+
+`let` crea un *legame* (_binding_) fra un nome e un valore: *non è un assegnamento*, il valore di `x` non cambierà più. Il tipo è dedotto guardando la *struttura* dell'espressione, senza calcolarla.
+
+I nomi contengono lettere, cifre, `_` e `'`, e iniziano con una lettera minuscola o con `_`: `x_plus_3` e `x'` vanno bene; `Seven` no (con la maiuscola OCaml cerca un *costruttore*: `Unbound constructor`), `7x` e `x-plus-3` neanche.
+
+In OCaml *tutto è un'espressione*: non ci sono comandi che cambiano uno stato, ogni costrutto calcola un valore. I tipi di base:
+
+#align(center, table(columns: 3, align: left,
+  [Tipo], [Valori], [Operazioni],
+  [`int`], [`3`, `-1`], [`+ - * /`, `mod` (resto)],
+  [`float`], [`3.2`, `3.` (cioè 3.0)], [`+. -. *. /.` con il punto, `**` (potenza)],
+  [`bool`], [`true`, `false`], [`&&`, `||`, `not`],
+  [`char`], [`'a'` (apici)], [`int_of_char 'a'` dà `97`, `char_of_int`],
+  [`string`], [`"abcd"` (virgolette)], [`^` concatena: `"hello" ^ "world"`],
+  [`unit`], [solo `()`], [come `void` in C],
+))
+
+Su tutti i tipi si confronta con `= <> < > <= >=`.
+
+#nota[Trappole per chi viene dal C: l'uguaglianza è `=`, non `==`; il diverso è `<>`, non `!=`. `&&` e `||` sono *cortocircuitati*: in `e1 && e2`, se `e1` è `false` il risultato è già `false` ed `e2` non viene valutata.]
+
+OCaml *non ha overloading*: `+` lavora solo sugli `int`, e per i `float` serve `+.`. E *non ha conversioni implicite*: in C o Java `3 + 2.5` vale 5.5 (il 3 viene promosso a `float`), e il cast `(int) 3.2` tronca a 3. In OCaml `3 + 2.5` è un errore di tipo, e la conversione si scrive:
+
+```ocaml
+(float_of_int 3) +. 2.4;;   (* - : float = 5.4 *)
+int_of_float 3.7;;          (* - : int = 3 *)
+int_of_string "10";;        (* - : int = 10 *)
+```
+
+Due motivi: le conversioni implicite sono una fonte di errori difficili da trovare, e la type inference ha bisogno di sapere con esattezza il tipo di ogni espressione.
+
+Il primo tipo strutturato è la *tupla*: una sequenza di valori, anche di tipi diversi, separati da virgole (le parentesi si possono omettere). I componenti si riconoscono dalla posizione, non da un nome.
+
+```ocaml
+let t = (10, "hello", 12.5);;
+(* val t : int * string * float = (10, "hello", 12.5) *)
+```
+
+Il tipo è il *prodotto* dei tipi dei componenti: se vediamo `int` e `float` come gli insiemi $ZZ$ e $RR$, `int * float` è il prodotto cartesiano $ZZ times RR$, e `(3, 4.2)` ne è un elemento. Una tupla si può *destrutturare* con `let`, scrivendo a sinistra un *pattern* con la stessa forma:
+
+```ocaml
+let p = (3.0, 5.0);;   (* val p : float * float = (3., 5.) *)
+let (x, y) = p;;       (* val x : float = 3.   val y : float = 5. *)
+x +. y;;               (* - : float = 8. *)
+```
+
+== Funzioni
+
+Come nel λ-calcolo, in OCaml le *funzioni sono valori*: possono essere il risultato di un'espressione, essere passate a un'altra funzione o restituite da una funzione. La λ diventa `fun`, il punto diventa `->`:
+
+```ocaml
+fun x -> x + 1;;          (* - : int -> int = <fun> *)
+(fun x -> x + 1) 10;;     (* - : int = 11 *)
+```
+
+`fun x -> x + 1` è $lambda x. x + 1$: una funzione *anonima* (senza nome), con argomento `x` e corpo `x + 1`. Il tipo `int -> int` dice che prende un intero e restituisce un intero; il valore è scritto `<fun>`, perché una funzione non si può stampare. In JavaScript la stessa funzione è `function(x) { return x+1 }` o `x => x + 1`; anche Java ha le _lambda expressions_. Sono tutte idee prese dal λ-calcolo.
+
+La traduzione da λ-calcolo (con numeri e operazioni) a OCaml è una funzione $⟦dot⟧$, definita per ricorsione sulla struttura dei termini come $"FV"$: un caso per ogni elemento della sintassi.
+
+#align(center, table(columns: 2, align: left,
+  [λ-termine], [OCaml],
+  [$⟦n⟧$ (un numero)], [`n`],
+  [$⟦x⟧$], [`x`],
+  [$⟦T' "op" T''⟧$ (op è `+ - * /`)], [$⟦T'⟧$ `op` $⟦T''⟧$],
+  [$⟦lambda x. T'⟧$], [`fun x ->` $⟦T'⟧$],
+  [$⟦T' T''⟧$], [$⟦T'⟧ ⟦T''⟧$],
+))
+
+Si traduce ogni λ-termine, ma non tutto OCaml viene da un λ-termine: la sintassi di OCaml è molto più ricca. Per esempio $⟦lambda f. lambda n. f n + 1⟧ = $ `fun f -> fun n -> f n + 1`. Applicata a $lambda x. 2 * x$ e a 10 dà lo stesso risultato della β-riduzione (l'applicazione associa a sinistra, e $f n$ si calcola prima del $+$):
+
+$ (lambda f. lambda n. f n + 1)(lambda x. 2 * x) 10 arrow.r (lambda n. (lambda x. 2 * x) n + 1) 10 arrow.r (lambda n. 2 * n + 1) 10 arrow.r 20 + 1 = 21 $
+
+```ocaml
+(fun f -> fun n -> f n + 1) (fun x -> 2 * x) 10;;   (* - : int = 21 *)
+```
+
+È una *funzione di ordine superiore* (_higher-order_): prende una funzione (`f`) come parametro.
+
+Con più parametri si scrive una catena di `fun`, e il tipo è una catena di frecce:
+
+```ocaml
+fun x -> fun y -> x + y;;   (* - : int -> int -> int = <fun> *)
+```
+
+`->` nei tipi *associa a destra*: `int -> int -> int` è `int -> (int -> int)`, una funzione che prende `x` e restituisce la funzione `fun y -> x + y`.
+
+Per scrivere meno, `fun x y -> x + y` sta per `fun x -> fun y -> x + y`. È *zucchero sintattico*: un costrutto che non aggiunge niente al linguaggio, perché si può scrivere con altri costrutti, ma rende il codice più comodo, come `x += 1` per `x = x + 1` in C.
+
+Siccome le funzioni sono valori, si legano a un nome con `let`. La seconda forma è zucchero per la prima ed è *il modo più comune di definire funzioni*:
+
+```ocaml
+let somma = fun x y -> x + y;;
+let somma x y = x + y;;         (* val somma : int -> int -> int = <fun> *)
+somma 3 4;;                     (* - : int = 7 *)
+```
+
+C'è anche `function x -> x + 1`, che prende *un solo* parametro: torna utile con il pattern matching (@pattern).
+
+*Non esiste il `return`*: il corpo di una funzione è un'espressione, e il suo valore è il risultato. In un linguaggio imperativo il corpo è una sequenza di comandi, e `return` serve a interromperla e dire cosa restituire.
+
+```ocaml
+let media x y = (x +. y) /. 2.0;;
+(* val media : float -> float -> float = <fun> *)
+```
+
+#nota[Senza parentesi, `x +. y /. 2.0` calcola $x + y/2$: `/.` ha la precedenza su `+.` come nella matematica. `media 4. 6.` darebbe `7.` invece di `5.`.]
+
+Un `let` "nudo" vale per tutto quello che viene dopo (ambiente globale). `let ... in` invece dichiara una variabile *locale*, visibile solo nell'espressione dopo `in` (come una variabile dichiarata in un blocco `{ }` in C):
+
+```ocaml
+let z = 10 in z * z / 2;;   (* - : int = 50 *)
+let w = 5 * z;;             (* Error: Unbound value z *)
+```
+
+Si legge come in matematica: "sia $z = 10$ in $z^2 \/ 2$". Con `let ... in` si definiscono anche *funzioni ausiliarie*: `let f x = 2 * x in f (f 10)` vale 40. Un esempio completo: le soluzioni di $a x^2 + b x + c = 0$ sono $(-b plus.minus sqrt(Delta)) \/ 2a$ con $Delta = b^2 - 4 a c$.
+
+```ocaml
+let sol a b c =
+  let delta = b *. b -. 4. *. a *. c in
+  let sol' op = (op (-. b) (sqrt delta)) /. (2. *. a) in
+  (sol' (+.), sol' (-.));;
+(* val sol : float -> float -> float -> float * float = <fun> *)
+sol 1. (-5.) 6.;;   (* - : float * float = (3., 2.) *)
+```
+
+- `delta` è calcolato una volta sola e usato due volte; `sqrt` è la radice quadrata, già definita.
+- Le due soluzioni differiscono solo per l'operazione ($+$ o $-$), quindi la funzione ausiliaria `sol'` la prende come parametro `op`.
+- `(+.)` è l'operatore `+.` in *forma prefissa* (prima degli operandi): `(+.) 3.5 2.0` vale `5.5`. Un operatore usato così va tra parentesi, altrimenti OCaml lo legge in forma infissa (in mezzo agli operandi). `(-. b)` è $-b$, e anche `(-5.)` va tra parentesi.
+
+Il nome della funzione e gli argomenti sono separati da *spazi*, senza parentesi né virgole. Queste funzioni si chiamano *curried*: prendono gli argomenti uno alla volta, come nel λ-calcolo (@currying). `somma 3 4` è `(somma 3) 4`. Si possono usare anche parentesi e virgole, ma è un'altra funzione:
+
+#align(center, table(columns: 3, align: left,
+  [Definizione], [Tipo], [Chiamata],
+  [`let somma x y = x + y`], [`int -> int -> int`], [`somma 3 4`, un argomento alla volta],
+  [`let somma (x, y) = x + y`], [`int * int -> int`], [`somma (3, 4)`: *un solo* argomento, una coppia, destrutturata in `x` e `y`],
+))
+
+Il vantaggio della forma curried è l'*applicazione parziale*: passando solo il primo argomento si ottiene una funzione che aspetta il secondo. Nel λ-calcolo $(lambda x. lambda y. x + y) 10 arrow.r lambda y. 10 + y$.
+
+```ocaml
+somma 10;;                  (* - : int -> int = <fun> *)
+let somma_dieci = somma 10;;
+somma_dieci 5;;             (* - : int = 15 *)
+```
+
+Da un'unica definizione si ottengono infinite funzioni (`somma 1`, `somma 5`…). Non è come i parametri opzionali o con valore di default di altri linguaggi: lì la funzione chiamata è sempre la stessa, si evita solo di scrivere qualche argomento.
+
+== Condizioni e ricorsione
+
+Nei linguaggi imperativi il flusso si controlla con `if` e con i cicli (`while`), che hanno senso perché c'è l'assegnamento: un `if` sceglie fra due assegnamenti, un `while` ne ripete uno. In OCaml le variabili sono *immutabili*, come le incognite di un'espressione algebrica: non c'è assegnamento, e quindi un ciclo non avrebbe niente da cambiare. Il flusso si controlla con l'espressione `if` e con la *ricorsione*, che ripete un calcolo richiamando la stessa funzione.
+
+`if` è un'*espressione*, come `( ? : )` in C e JavaScript: ha *sempre* tutti e due i rami, `then` ed `else`, *dello stesso tipo*, e si può mettere a destra di un `let`.
+
+```ocaml
+let x = 23;;
+let y = if x > 10 then 1 else 0;;   (* val y : int = 1 *)
+```
+
+#nota[`let f x = if x > 0 then x else "errore"` è un errore di tipo: un ramo è `int`, l'altro `string`, e il tipo del risultato non si può decidere. Senza `else`, invece, `f` non saprebbe cosa restituire quando $x <= 0$: il corpo è un'unica espressione, e dopo l'`if` non si può scrivere altro.]
+
+Una funzione ricorsiva si dichiara con *`let rec`*:
+
+```ocaml
+let fact n = if n <= 0 then 1 else n * fact (n - 1);;
+(* Error: Unbound value fact  (Hint: ... add the rec keyword) *)
+let rec fact n = if n <= 0 then 1 else n * fact (n - 1);;
+(* val fact : int -> int = <fun> *)
+```
+
+Il motivo: `let fact n = e` sta per `let fact = fun n -> e`, e mentre si valuta `fun n -> e` il nome `fact` non esiste ancora. `rec` rende il nome visibile anche dentro la sua definizione; è il costrutto $fix$ di PCF (@fix). La definizione somiglia a quella matematica: una scelta fra due casi, e in uno la funzione richiama se stessa.
+
+$ "fact"(n) = cases(1 & "se" n <= 0, n dot "fact"(n - 1) & "altrimenti") $
+
+```ocaml
+let rec fibonacci n =
+  if n = 0 || n = 1 then n else fibonacci (n - 1) + fibonacci (n - 2);;
+(* metodo di Euclide *)
+let rec mcd n m = if m = 0 then n else mcd m (n mod m);;
+```
+
+Una funzione può usare solo funzioni definite prima. Due funzioni che si chiamano a vicenda (*mutuamente ricorsive*) si definiscono insieme, unite da `and`:
+
+```ocaml
+let rec pari n = if n = 0 then true else dispari (n - 1)
+and dispari n = if n = 0 then false else pari (n - 1);;
+pari 6;;      (* - : bool = true *)
+```
+
+== Type inference e polimorfismo
+
+Il toplevel dà il tipo di ogni espressione senza che lo scriviamo. Lo ricava da due certezze: i *valori* hanno un tipo preciso (`5.` è `float`), e gli *operatori* lavorano su tipi precisi (`+` solo su `int`, `+.` solo su `float`). Da qui deduce il tipo delle variabili: in `x + y`, `x` e `y` devono essere `int`. Procede dalle foglie dell'albero di sintassi verso la radice, tenendo una lista "variabile ↦ tipo". Se la stessa variabile compare due volte, i due tipi devono coincidere, o essere *unificabili* (uno più generico dell'altro, si prende il meno generico); altrimenti è un errore di tipo. `(x+1)-(x+4)` va bene, `(x+1)-(x+.4.0)` no: la prima `x` è `int`, la seconda `float`.
+
+Con le funzioni si guardano anche argomenti e risultati. In `fun f -> fun n -> f n + 1` (l'applicazione ha la precedenza su `+`, quindi il corpo è `(f n) + 1`): `f n` è un operando di `+`, quindi è `int`; `f` è applicata, quindi è una funzione; di `n` non si sa niente, e il suo tipo resta un generico `'a`. Il risultato è `('a -> int) -> 'a -> int`.
+
+Il metodo si fa a mano con i *vincoli*: una *variabile di tipo* (un tipo ancora sconosciuto) per ogni parametro e una per il risultato, poi un'equazione per ogni pezzo della funzione, poi si risolve.
+
+```ocaml
+let sum_if_true test first second =
+  (if test first then first else 0) + (if test second then second else 0);;
+```
+
+Il tipo ha la forma `TEST -> FIRST -> SECOND -> RIS`.
+
+#align(center, table(columns: 2, align: left,
+  [Vincolo], [Da dove viene],
+  [`TEST = FIRST -> bool`], [`test first` è la condizione del primo `if`],
+  [`TEST = SECOND -> bool`], [`test second` è la condizione del secondo `if`],
+  [`FIRST = int`], [i rami del primo `if` sono `first` e `0`],
+  [`SECOND = int`], [i rami del secondo `if` sono `second` e `0`],
+  [`RIS = int`], [il risultato di `+` è `int`],
+))
+
+Risolvendo: `FIRST = SECOND = int`, `TEST = int -> bool`, `RIS = int`, cioè `(int -> bool) -> int -> int -> int`. La funzione somma `first` e `second`, ma solo quelli che superano il controllo `test`; gli altri contano 0. Una funzione che restituisce `true` o `false`, come `test`, si chiama *predicato*. Passando predicati diversi la stessa funzione somma solo i pari, solo i positivi, o altro:
+
+```ocaml
+sum_if_true (fun x -> x mod 2 = 0) 3 4;;    (* - : int = 4 *)
+sum_if_true (fun x -> x > 0) 3 (-4);;       (* - : int = 3 *)
+```
+
+Il predicato non deve essere per forza anonimo: va bene anche una funzione con nome, anche ricorsiva, come una `potenza_di_due`.
+
+A volte i vincoli non bastano a fissare un tipo concreto:
+
+```ocaml
+let id x = x;;   (* val id : 'a -> 'a = <fun> *)
+id 4;;           (* - : int = 4 *)
+id "ciao";;      (* - : string = "ciao" *)
+```
+
+`id` è *polimorfa*: si applica a argomenti di tipi diversi. `'a` (si legge "alfa") è una *variabile di tipo*: al suo posto può andare un tipo qualsiasi, ma se compare più volte va sostituita sempre con lo stesso tipo. Quindi `'a -> 'a` dice che il risultato ha lo stesso tipo dell'argomento, qualunque sia. A ogni applicazione OCaml *specializza* `'a` sul tipo dell'argomento.
+
+```ocaml
+let first_if_true test first second = if test first then first else second;;
+```
+
+Vincoli: `TEST = FIRST -> bool` (la condizione), `FIRST = SECOND` (i due rami), `RIS = FIRST` (il ramo `then`). Nessuno fissa un tipo concreto: `('a -> bool) -> 'a -> 'a -> 'a`.
+
+#nota[Basta un ramo concreto per cambiare tutto: con `then 2` al posto di `then first` si aggiunge `RIS = SECOND = int`, mentre `FIRST` resta libero. Il tipo diventa `('a -> bool) -> 'a -> int -> int`.]
+
+```ocaml
+let maggiore x y = if x > y then x else y;;
+(* val maggiore : 'a -> 'a -> 'a = <fun> *)
+maggiore 6 5;;                 (* - : int = 6 *)
+maggiore "albero" "gatto";;    (* - : string = "gatto" *)
+maggiore (fun x -> x) (fun x -> x + 1);;
+(* Exception: Invalid_argument "compare: functional value". *)
+```
+
+`>` si può usare su qualunque tipo, quindi `x` e `y` sono `'a` (lo stesso per tutti e due). Con due funzioni il controllo dei tipi passa, ma *durante l'esecuzione* il confronto solleva un'*eccezione* (una situazione anomala a tempo di esecuzione). Anche `(fun x -> x) = (fun y -> y)` fa lo stesso. Non è un limite di OCaml: due funzioni $f$ e $g$ sono uguali se $f(x) = g(x)$ per ogni $x$, e un algoritmo che lo decidesse risolverebbe il problema della fermata. È *indecidibile*.
+
+Un'*annotazione di tipo* `(x : int)` dice al compilatore il tipo voluto, e può restringere il polimorfismo (le parentesi sono obbligatorie):
+
+```ocaml
+let maggiore (x : int) (y : int) : int = if x > y then x else y;;
+(* val maggiore : int -> int -> int = <fun> *)
+```
+
+Così `maggiore` non si può più applicare a funzioni. Per averla su `int` e su `string`, e non su altro, servono due funzioni con *nomi diversi* (`maggiore_int`, `maggiore_string`): OCaml non ha *overloading*, cioè non permette due funzioni con lo stesso nome che differiscono per numero o tipo dei parametri (in Java e C\# si può).
+
+Anche TypeScript ha la type inference con tipi polimorfi, ma fa scelte diverse:
+
+#align(center, table(columns: 3, align: left,
+  [], [TypeScript], [OCaml],
+  [Identità], [`id(x: any): any` spegne ogni controllo (accetta `12 * id("hello")`) e non dice che il risultato ha il tipo dell'argomento], [`'a -> 'a`],
+  [Polimorfismo], [esplicito: con i _generics_ si scrive `id<T>(x: T): T`], [implicito: `'a` lo deduce il compilatore],
+  [Due tipi possibili], [tipo unione `number | string`: accetta `maggiore(3, "hello")`, e rifiuta `maggiore(2, 4) / 2` perché non sa se il risultato è un numero], [due funzioni distinte],
+))
+
+OCaml è più rigoroso: vuole il tipo preciso (anche polimorfo) di ogni espressione, quindi niente conversioni implicite né tipi "ambigui". TypeScript lascia più libertà per restare vicino a JavaScript, e qualche errore in più passa. Nessuno dei due è "migliore": hanno scopi diversi.
+
+= Liste e pattern matching
+
+#obiettivi(
+  [costruire liste con `[ ; ]`, `::` e `@` e dire il loro tipo],
+  [dire se un valore fa match con un pattern, e scrivere `match` esaustivi],
+  [scrivere funzioni ricorsive su liste, anche con l'accumulatore (ricorsione in coda)],
+  [usare `exists`, `for_all`, `filter`, `map`, `fold_right`, `fold_left`, e scegliere fra le due fold],
+)
+
+== Liste
+
+Una *lista* è una sequenza finita e *immutabile* di valori *dello stesso tipo*. Si scrive fra parentesi quadre, con gli elementi separati da `;`. Se gli elementi hanno tipo `T`, la lista ha tipo `T list`. Immutabile vuol dire che non si possono aggiungere, togliere o cambiare elementi: ogni operazione legge una lista e ne costruisce una nuova.
+
+```ocaml
+[3; 5; -1; 9];;                   (* - : int list = [3; 5; -1; 9] *)
+["cane"; "gatto"];;               (* - : string list *)
+[(1, "lun"); (2, "mar")];;        (* - : (int * string) list *)
+[[1; 2]; [2; 1]];;                (* - : int list list *)
+[];;                              (* - : 'a list = [] *)
+```
+
+La lista vuota `[]` ha tipo `'a list`: non ha elementi che fissino il tipo.
+
+#nota[`[1, 2]` non è una lista di due interi: la virgola costruisce una coppia, quindi è una lista con *un solo* elemento, `(1, 2)`, di tipo `(int * int) list`.]
+
+Il tipo di una lista si trova *unificando* i tipi degli elementi: si cerca il tipo più generale compatibile con tutti.
+
+```ocaml
+[[]; []];;         (* - : 'a list list *)
+[[]; []; [3]];;    (* - : int list list *)
+[(fun x -> x + 1); (fun x -> x)];;   (* - : (int -> int) list *)
+```
+
+Finché ci sono solo liste vuote il tipo resta generico; appena entra `[3]` diventa `int list list`. Allo stesso modo `fun x -> x` (tipo `'a -> 'a`) si specializza in `int -> int`. Con tre funzioni:
+
+```ocaml
+let f x y = 3;;       (* val f : 'a -> 'b -> int *)
+let g x y = x + 1;;   (* val g : int -> 'a -> int *)
+let h x y = y + 1;;   (* val h : 'a -> int -> int *)
+[f; g];;              (* - : (int -> 'a -> int) list *)
+[g; h];;              (* - : (int -> int -> int) list *)
+```
+
+`g` fissa il primo parametro a `int`, `h` il secondo: insieme li fissano tutti e due. Il tipo trovato così si chiama *most general unifier* (MGU): il tipo più generale che rispetta tutti i vincoli.
+
+Il costruttore fondamentale è *`::`* (_cons_): se `l` ha tipo `T list` ed `e` ha tipo `T`, `e :: l` è la lista che ha `e` come primo elemento, seguito dagli elementi di `l`.
+
+```ocaml
+4 :: [3; 2; 1];;           (* - : int list = [4; 3; 2; 1] *)
+1 :: 2 :: 3 :: 4 :: [];;   (* - : int list = [1; 2; 3; 4] *)
+```
+
+`[1; 2; 3; 4]` è zucchero per `1 :: (2 :: (3 :: (4 :: [])))`, e le parentesi si tolgono perché `::` associa a destra. Si vede la natura *induttiva* delle liste: si parte da `[]` e si mette davanti 4, poi 3, poi 2, poi 1.
+
+Si dice spesso che `::` "aggiunge un elemento in testa", ma non è esatto: le liste sono immutabili, e `e :: l` è una lista *nuova*. Eppure non copia niente. Le liste sono *liste concatenate*: ogni nodo contiene un elemento e un puntatore al nodo dopo; la croce è la fine della lista.
+
+#let nodi(xs, x0, y, ultimo: true) = {
+  import draw: *
+  for (i, v) in xs.enumerate() {
+    let x = x0 + i * 1.7
+    rect((x, y), (x + 0.75, y + 0.6))
+    content((x + 0.375, y + 0.3), v)
+    rect((x + 0.75, y), (x + 1.1, y + 0.6))
+    if i < xs.len() - 1 {
+      line((x + 0.925, y + 0.3), (x + 1.7, y + 0.3), mark: (end: "stealth"))
+    } else if ultimo {
+      line((x + 0.75, y), (x + 1.1, y + 0.6)); line((x + 0.75, y + 0.6), (x + 1.1, y))
+    }
+  }
+}
+#let nome(p, t) = {
+  import draw: *
+  content(p, text(9pt, fill: red, raw(t)))
+}
+
+#figura(canvas(length: 1cm, {
+  import draw: *
+  nodi(([1],), 0, 0, ultimo: false)
+  line((0.925, 0.3), (1.7, 0.3), mark: (end: "stealth"))
+  nodi(([2], [3], [4]), 1.7, 0)
+  nome((0.375, -0.35), "lis2"); nome((2.075, -0.35), "lis1")
+}), [`lis1 = [2; 3; 4]` e `lis2 = 1 :: lis1`: il nuovo nodo punta alla vecchia lista])
+
+Le due liste *condividono* i nodi di `lis1`. Siccome nessuno può modificarli, per il programmatore è come se fossero due liste distinte, e non si spreca memoria.
+
+La *concatenazione* `lis1 @ lis2` (_append_) mette in fila due liste. Questa volta la prima lista *viene copiata*, nodo per nodo:
+
+```ocaml
+[1; 2; 3] @ [4; 5; 6];;    (* - : int list = [1; 2; 3; 4; 5; 6] *)
+```
+
+#figura(canvas(length: 1cm, {
+  import draw: *
+  nodi(([1], [2], [3]), 0, 1.4)
+  nodi(([4], [5], [6]), 5.4, 1.4)
+  nodi(([1], [2], [3]), 0, 0, ultimo: false)
+  line((4.325, 0.3), (5.4, 1.5), mark: (end: "stealth"))
+  nome((0.375, 2.35), "lis1"); nome((5.775, 2.35), "lis2"); nome((0.375, -0.35), "lis3")
+}), [`lis3 = lis1 @ lis2`: i nodi di `lis1` sono copiati, l'ultima copia punta a `lis2`])
+
+Se invece `@` cambiasse il puntatore dell'ultimo nodo di `lis1` per farlo puntare a `lis2`, `lis1` non sarebbe più `[1; 2; 3]`: la distruggerebbe.
+
+Il modulo `List` della libreria standard ha molte funzioni pronte, che si chiamano con `List.` davanti:
+
+#align(center, table(columns: 3, align: left,
+  [Funzione], [Cosa fa], [Esempio],
+  [`List.length`], [lunghezza], [`List.length [5; 2; 1]` = `3`],
+  [`List.hd`], [_head_, il primo elemento], [`List.hd [5; 2; 1]` = `5`],
+  [`List.tl`], [_tail_, la lista senza il primo], [`List.tl [5; 2; 1]` = `[2; 1]`],
+  [`List.rev`], [rovescia], [`List.rev [5; 2; 1]` = `[1; 2; 5]`],
+))
+
+== Pattern matching <pattern>
+
+Per leggere gli elementi di una lista bisogna *destrutturarla*. Lo strumento è il *pattern matching*, che funziona su tutti i tipi, non solo sulle liste:
+
+```ocaml
+match EXP with
+| P_1 -> EXP_1
+| P_2 -> EXP_2
+...
+| P_N -> EXP_N
+```
+
+Ogni riga `P_i -> EXP_i` è un *ramo* (o caso). Il valore di `EXP` si confronta con i pattern *dall'alto in basso*: al primo `P_i` che *combacia* (fa _match_) si valuta `EXP_i`, e gli altri rami si ignorano. Un pattern è uno di questi:
+- un valore di un tipo di base (non una funzione): `true`, `0`, `2.3`, `'a'`, `"abc"`;
+- una variabile: `x`, `y`…;
+- una tupla di pattern: `(P_1, ..., P_N)`;
+- una lista di lunghezza fissa: `[P_1; ...; P_N]`;
+- una lista con cons: `P_1 :: P_2`;
+- la *wildcard* `_`, che combacia con tutto.
+
+#teorema[Match][Un valore $v$ fa match con un pattern $P$ se $P$ è `_`, oppure $P = v$, oppure si possono sostituire le variabili di $P$ con dei valori ottenendo $P'$ con $P' = v$.]
+
+In pratica $P$ "copre" la forma di $v$, e intanto lega le sue variabili ai pezzi di $v$ corrispondenti.
+
+#align(center, table(columns: 3, align: left,
+  [Pattern], [Fanno match], [Non fanno match],
+  [`1`], [`1`], [`0`, `2`, `3`],
+  [`(3, 2)`], [`(3, 2)`], [`(2, 3)`, `(4, 2)`],
+  [`(x, y)`], [`(3, 2)`, `(2, 3)`, `(4, 2)`], [`(1, 3, 2)`, `(1, 4, 3, 2)`],
+  [`(x, 2)`], [`(3, 2)`, `(4, 2)`, `("ciao", 2)`], [`(2, 3)`, `(4, 2, 1)`],
+  [`[]`], [`[]`], [`[3]`, `[1; 5]`, `['a'; 'b'; 'c']`],
+  [`[3]` o `3 :: []`], [`[3]`], [`[]`, `[1; 5]`, `['a'; 'b'; 'c']`],
+  [`3 :: x`], [`[3]`, `[3; 4; 5]`], [`[]`, `[1; 5]`, `['a'; 'b'; 'c']`],
+  [`x :: y`], [`[3]`, `[3; 4; 5]`, `[1; 5]`, `['a'; 'b'; 'c']`], [`[]`],
+  [`_`], [`5`, `true`, `"abc"`, `(3, "hello")`, `[3; 2; 4]`, `[]`], [],
+))
+
+In `x :: lis'` la variabile `x` è il *primo elemento* e `lis'` è *la lista degli altri*: in una lista di interi `x` è un `int` e `lis'` una `int list`. Una funzione con il `match` si legge come una funzione definita per casi:
+
+```ocaml
+let rec fibonacci n = match n with
+  | 0 -> 0
+  | 1 -> 1
+  | _ -> fibonacci (n - 1) + fibonacci (n - 2);;   (* tutti gli altri *)
+let my_or x y = match (x, y) with        (* match su una coppia *)
+  | (false, false) -> false
+  | _ -> true;;
+let inizia_con_zero lis = match lis with
+  | 0 :: _ -> true
+  | _ -> false;;
+let lunghezza_uno lis = match lis with
+  | _ :: [] -> true
+  | _ -> false;;
+```
+
+È bene (ma non obbligatorio) che i pattern siano *esaustivi*: ogni valore possibile deve combaciare con almeno un ramo. Se manca un caso il compilatore dà un _warning_ (un avviso: compila lo stesso) con un esempio di valore scoperto; un warning arriva anche per un ramo che non può mai scattare, per esempio uno messo dopo `_`.
+
+```ocaml
+let giorno n = match n with
+  | 1 -> "lunedì" | 2 -> "martedì" | 3 -> "mercoledì" | 4 -> "giovedì"
+  | 5 -> "venerdì" | 6 -> "sabato" | 7 -> "domenica";;
+(* Warning 8: this pattern-matching is not exhaustive.
+   Here is an example of a case that is not matched: 0 *)
+giorno 7;;   (* - : string = "domenica" *)
+giorno 8;;   (* Exception: Match_failure ... *)
+```
+
+Quando una funzione fa subito il `match` sul suo argomento si usa *`function`*, che prende i pattern al posto del parametro (il nome del parametro sparisce). Con più parametri, `function` fa il match sull'ultimo:
+
+```ocaml
+let is_empty = function
+  | [] -> true
+  | _ -> false;;
+let is_first n = function       (* val is_first : 'a -> 'a list -> bool *)
+  | [] -> false
+  | x :: _ -> x = n;;
+```
+
+Fin qui il `match` sembra uno `switch`, solo che controlla anche la *forma* del valore (per esempio "lista non vuota"). La vera forza è un'altra: intanto che controlla, *smonta* la struttura e dà un nome ai pezzi, cioè lega le variabili del pattern, e le si può usare nel ramo. Per le tuple basta il `let`, che fa un match implicito:
+
+```ocaml
+let primo (x, _) = x;;   (* val primo : 'a * 'b -> 'a *)
+let testa lis = match lis with x :: _ -> x;;
+(* Warning 8: ... not matched: []   val testa : 'a list -> 'a *)
+```
+
+`testa` è una *funzione parziale*: funziona solo sulle liste non vuote.
+
+Più pattern con la stessa espressione si *accorpano* con `|`. Le variabili però devono comparire in *tutti* i pattern accorpati:
+
+```ocaml
+let giorno_festivo n = match n with
+  | 1 | 2 | 3 | 4 | 5 -> "feriale"
+  | 6 | 7 -> "festivo"
+  | _ -> "errore";;
+let somma_coppia c = match c with
+  | (x, 0) | (0, x) -> x
+  | (x, y) -> x + y;;
+let lunghezza_uno_due lis = match lis with
+  | x :: [] | x :: y :: [] -> true
+  (* Error: Variable y must occur on both sides of this | pattern *)
+  | _ -> false;;
+```
+
+Se fosse permesso, in `x :: [] | x :: y :: [] -> x + y` la `y` non avrebbe valore quando la lista ha un solo elemento. Il compilatore controlla i pattern senza guardare l'espressione dopo `->`, quindi segnala l'errore anche qui, dove il ramo restituisce solo `true`. Si risolve separando i due rami, oppure, visto che le variabili non servono, con le wildcard: `| _ :: [] | _ :: _ :: [] -> true`.
+
+#esercizio(12)[Determinare il tipo delle seguenti espressioni OCaml:
+```ocaml
+(* A *) (3, 10.2) :: (3, 2.1) :: [];;
+(* B *) [] :: [];;
+(* C *) fun x -> fun y -> (x, if y > 0 then x else y < 10);;
+(* D *) (fun x -> fun y -> x + y) 10;;
+(* E *) let f x y z =
+          if x then []
+          else match y with
+          | (0, 0) -> []
+          | (n1, n2) -> z :: [n1; n2];;
+(* F *) let g x y z =
+          let k = 10 in
+          if x = k then y
+          else [z];;
+```]
+
+== Ricorsione sulle liste
+
+Il pattern matching serve a scrivere funzioni ricorsive sulle liste. Una lista ha due forme, e la funzione ha un ramo per ciascuna, come una dimostrazione per induzione:
+- *caso base*: la lista vuota `[]`;
+- *caso ricorsivo*: `x :: lis'`, dove la funzione si richiama su `lis'`, più corta.
+
+```ocaml
+let rec length lis = match lis with
+  | [] -> 0
+  | _ :: lis' -> 1 + length lis';;
+let rec somma lis = match lis with
+  | [] -> 0
+  | x :: lis' -> x + somma lis';;
+(* val contains : 'a -> 'a list -> bool *)
+let rec contains x lis = match lis with
+  | [] -> false
+  | y :: lis' -> if y = x then true else contains x lis';;
+```
+
+Anche `@` si scrive così: se la prima lista è vuota il risultato è la seconda; altrimenti si mette il primo elemento davanti alla concatenazione del resto.
+
+```ocaml
+let rec append lis1 lis2 = match lis1 with
+  | [] -> lis2
+  | x :: lis1' -> x :: append lis1' lis2;;
+```
+
+Ogni chiamata stacca un elemento da `lis1` e lo tiene in sospeso; quando `lis1` è vuota, i risultati risalgono:
+
+```
+append [1; 2] [3; 4] = 1 :: append [2] [3; 4]
+                     = 1 :: (2 :: append [] [3; 4])
+                     = 1 :: (2 :: [3; 4])
+                     = [1; 2; 3; 4]
+```
+
+Il tempo è *lineare* nella lunghezza di `lis1`: una chiamata per elemento. Per *rovesciare* una lista l'idea più diretta è "rovescio il resto e metto il primo in fondo":
+
+```ocaml
+let rec rev lis = match lis with
+  | [] -> []
+  | x :: lis' -> rev lis' @ [x];;
+```
+
+```
+rev [1; 2; 3] = rev [2; 3] @ [1]
+              = (rev [3] @ [2]) @ [1]
+              = ((rev [] @ [3]) @ [2]) @ [1]
+              = ([3] @ [2]) @ [1] = [3; 2] @ [1] = [3; 2; 1]
+```
+
+Funziona, ma è lenta: ogni `@` ricopia tutta la parte già rovesciata. Meglio un secondo parametro, l'*accumulatore*, che parte da `[]` e costruisce il risultato passo per passo:
+
+```ocaml
+let rev lis =
+  let rec rev_accum lis1 lis2 = match lis1 with
+    | [] -> lis2
+    | x :: lis1' -> rev_accum lis1' (x :: lis2)
+  in rev_accum lis [];;
+```
+
+A ogni chiamata il primo elemento di `lis1` passa in testa a `lis2`, quindi gli elementi arrivano in ordine inverso:
+
+```
+rev_accum [1; 2; 3] []
+→ rev_accum [2; 3] [1]
+→ rev_accum [3] [2; 1]
+→ rev_accum [] [3; 2; 1]  =  [3; 2; 1]
+```
+
+In `rev_accum` la chiamata ricorsiva è *l'ultima operazione*: dopo non resta niente da fare. Una funzione così si dice *ricorsiva in coda* (_tail recursive_). In `somma`, invece, dopo la chiamata resta da fare `x + ...`. Il vantaggio è a tempo di esecuzione: ogni chiamata di funzione occupa nello *stack* (la pila della memoria) un *record di attivazione* con i suoi parametri, ma se non resta lavoro in sospeso basta *un solo* record, riusato a ogni chiamata. Il programma è più veloce, usa meno memoria, e soprattutto non rischia lo *stack overflow* (lo stack pieno, che ferma il programma) su liste lunghe. L'accumulatore è il modo tipico di scrivere funzioni ricorsive efficienti sulle liste.
+
+Un esempio più grosso: l'*area di un poligono* qualsiasi, date le coordinate dei vertici in senso antiorario. Il metodo:
++ si copia il primo vertice in fondo alla lista;
++ si somma ogni $x$ per la $y$ del vertice dopo: $sum x_i y_(i+1)$;
++ si somma ogni $y$ per la $x$ del vertice dopo: $sum y_i x_(i+1)$;
++ l'area è la differenza delle due somme, divisa per 2.
+
+#let poli = ((-3, -2), (-1, 4), (6, 1), (3, 10), (-4, 9))
+#let poli-c = poli + (poli.at(0),)
+#let s1 = range(5).map(i => poli-c.at(i).at(0) * poli-c.at(i + 1).at(1))
+#let s2 = range(5).map(i => poli-c.at(i).at(1) * poli-c.at(i + 1).at(0))
+
+#align(center, grid(columns: 2, column-gutter: 2em, align: horizon,
+  canvas(length: 0.28cm, {
+    import draw: *
+    line((-6, 0), (8, 0), stroke: grigio, mark: (end: "stealth"))
+    line((0, -4), (0, 12), stroke: grigio, mark: (end: "stealth"))
+    line(..poli, close: true, stroke: 1pt + blu, fill: rgb("#eef4ff"))
+    for (k, (x, y)) in poli.enumerate() {
+      circle((x, y), radius: 0.18, fill: black)
+      content((x + 0.4, y), anchor: "west", box(fill: white, inset: 1pt, text(8pt)[#"ABCDE".at(k) #h(0.1em) (#x, #y)]))
+    }
+  }),
+  table(columns: 4, align: (left, right, right, right),
+    [Vertice], [$x_i$, $y_i$], [$x_i y_(i+1)$], [$y_i x_(i+1)$],
+    ..range(5).map(i => ([#"ABCDE".at(i)], [#poli.at(i).at(0), #poli.at(i).at(1)], [#s1.at(i)], [#s2.at(i)])).flatten(),
+    [], [*somma*], [*#s1.sum()*], [*#s2.sum()*],
+  ),
+))
+
+L'area è $(#s1.sum() - (#s2.sum())) \/ 2 = #((s1.sum() - s2.sum()) / 2)$. Nel codice, invece di copiare il primo vertice in fondo (con `@`, che copierebbe tutta la lista), lo si passa come parametro `(x0, y0)` e lo si usa quando si arriva all'ultimo vertice. Le due somme si fanno in un unico passaggio, portandosi dietro una *coppia* di risultati:
+
+```ocaml
+let area pol =
+  let rec calcolo (x0, y0) lis = match lis with
+    | [] -> (1, 1)                       (* non succede mai *)
+    | (x, y) :: [] -> (x * y0, y * x0)   (* ultimo: il dopo è il primo *)
+    | (x1, y1) :: (x2, y2) :: lis' ->
+        let (ris1, ris2) = calcolo (x0, y0) ((x2, y2) :: lis') in
+        (ris1 + x1 * y2, ris2 + y1 * x2)
+  in
+  match pol with
+  | [] -> 0.
+  | p0 :: _ -> let (ris1, ris2) = calcolo p0 pol in
+               float_of_int (ris1 - ris2) /. 2.;;
+area [(-3, -2); (-1, 4); (6, 1); (3, 10); (-4, 9)];;   (* - : float = 60. *)
+```
+
+- Il ramo `[]` di `calcolo` non scatta mai (la si chiama su liste che hanno almeno un elemento), e c'è solo per rendere il match esaustivo.
+- Il terzo pattern guarda *due* vertici consecutivi, `(x1, y1)` e `(x2, y2)`, e nella chiamata ricorsiva rimette in testa il secondo.
+- Somme e prodotti sono su `int`; la divisione si fa su `float`, perché l'area può non essere intera.
+
+#esercizio(13)[Scrivere una funzione ricorsiva `somma_positivi` che, data una lista `lis` di interi, restituisce la somma degli elementi positivi. Ad esempio, `somma_positivi [3; 0; -1; 2; -4]` restituisce `5`.] <es-13>
+
+#esercizio(14)[Scrivere una funzione ricorsiva `somma_liste` che, date due liste `[x1; ...; xn]` e `[y1; ...; yn]` di uguale lunghezza, restituisca la lista `[x1+y1; ...; xn+yn]`. Se le liste hanno lunghezze diverse, la funzione restituisce la lista vuota.]
+
+#esercizio(15)[Scrivere una funzione ricorsiva `parentesi_bilanciate` che, data una lista `lis` di caratteri, restituisce `true` se la lista contiene una sequenza di caratteri `'('` e `')'` bilanciata. Ad esempio, `parentesi_bilanciate ['('; '('; ')'; '('; '('; ')'; ')'; ')']` restituisce `true`, mentre `parentesi_bilanciate ['('; '('; ')'; ')'; ')']` restituisce `false`.] <es-15>
+
+== Funzioni di ordine superiore sulle liste
+
+Sulle liste l'unico modo di ripetere un calcolo è la ricorsione, ma molte funzioni ricorsive hanno *lo stesso schema*. Queste tre differiscono solo per la condizione:
+
+```ocaml
+let rec contiene_zero lis = match lis with
+  | [] -> false
+  | x :: lis' -> if x = 0 then true else contiene_zero lis';;
+let rec contiene_positivo lis = ...   (* uguale, con x > 0 *)
+let rec contiene_pari lis = ...       (* uguale, con x mod 2 = 0 *)
+```
+
+Tutte scorrono la lista, controllano una condizione su ogni elemento, restituiscono `true` al primo che la soddisfa e `false` se arrivano in fondo. L'idea: la condizione diventa un *predicato* `p : 'a -> bool` passato come parametro, e lo schema si scrive una volta sola.
+
+```ocaml
+(* val exists : ('a -> bool) -> 'a list -> bool *)
+let rec exists p lis = match lis with
+  | [] -> false
+  | x :: lis' -> if p x then true else exists p lis';;
+let contiene_zero lis = exists (fun x -> x = 0) lis;;
+let contiene_pari lis = exists (fun x -> x mod 2 = 0) lis;;
+let contains x lis = exists (fun y -> x = y) lis;;
+```
+
+La ricorsione adesso è nascosta dentro `exists`. In `contains` la funzione `fun y -> x = y` usa `x`, che non è un suo parametro: è una sua variabile libera, che viene da fuori. Quello che `exists` riceve è allora una *chiusura* (_closure_): la funzione *insieme all'ambiente* in cui è stata creata, cioè ai valori delle sue variabili libere. La chiusura "ricorda" il valore di `x` e può confrontarlo con ogni `y`. Lo stesso si ottiene con l'applicazione parziale: con `let uguale x y = x = y`, si scrive `exists (uguale x) lis`.
+
+Con lo stesso metodo si scrivono le altre operazioni frequenti. *`forall`* controlla che *tutti* gli elementi soddisfino il predicato:
+
+```ocaml
+(* val forall : ('a -> bool) -> 'a list -> bool *)
+let rec forall p lis = match lis with
+  | [] -> true
+  | x :: lis' -> if p x then forall p lis' else false;;
+let tutti_pari lis = forall (fun x -> x mod 2 = 0) lis;;
+```
+
+*`filter`* tiene solo gli elementi che soddisfano il predicato:
+
+```ocaml
+(* val filter : ('a -> bool) -> 'a list -> 'a list *)
+let rec filter p lis = match lis with
+  | [] -> []
+  | x :: lis' -> if p x then x :: filter p lis' else filter p lis';;
+filter (fun x -> x mod 2 = 0) [1; 2; 3; 4];;   (* - : int list = [2; 4] *)
+```
+
+```
+filter pari [1; 2; 3; 4] = filter pari [2; 3; 4]     1 è dispari: scartato
+                         = 2 :: filter pari [3; 4]   2 è pari: tenuto
+                         = 2 :: filter pari [4]
+                         = 2 :: 4 :: filter pari []
+                         = 2 :: 4 :: []  =  [2; 4]
+```
+
+*`map`* applica la stessa funzione `f` a ogni elemento: `map f [x1; ...; xn] = [f x1; ...; f xn]`. Qui non serve un predicato ma una funzione qualsiasi, che può anche cambiare il tipo degli elementi:
+
+```ocaml
+(* val map : ('a -> 'b) -> 'a list -> 'b list *)
+let rec map f lis = match lis with
+  | [] -> []
+  | x :: lis' -> f x :: map f lis';;
+map (fun x -> x + 1) [1; 2; 3];;      (* - : int list = [2; 3; 4] *)
+map (fun (x, y) -> x) [(3, 2); (4, 7); (9, 2)];;
+(* - : int list = [3; 4; 9] *)
+```
+
+Queste funzioni guardano ogni elemento per conto suo. Spesso invece bisogna *combinare* tutti gli elementi in un unico risultato: la somma, il minimo e il massimo, la concatenazione di stringhe. In JavaScript si userebbe un ciclo con una variabile che accumula il risultato parziale:
+
+```js
+function somma(a) {
+  var s = 0
+  for (var i in a) s += a[i]
+  return s
+}
+```
+
+In un linguaggio funzionale non c'è una variabile da aggiornare: il risultato parziale *viaggia lungo la ricorsione*, come valore restituito o come parametro. Nella `somma` ricorsiva di prima, ogni chiamata restituisce la somma della lista dall'elemento corrente in fondo:
+
+```
+somma [3; 2; 4] = 3 + somma [2; 4]
+                = 3 + (2 + somma [4])
+                = 3 + (2 + (4 + somma []))
+                = 3 + (2 + (4 + 0))
+```
+
+Gli elementi si sommano *dall'ultimo al primo*, cioè da destra. Scrivendo `+` in forma prefissa è `(+) 3 ((+) 2 ((+) 4 0))`; chiamando $f$ l'operazione e $a$ il valore del caso base, lo schema è $f x_1 (f x_2 (... (f x_n a)))$. È la *`fold_right`*:
+
+```ocaml
+let rec fold_right f lis a = match lis with
+  | [] -> a
+  | x :: lis' -> f x (fold_right f lis' a);;
+(* val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b *)
+let somma lis = fold_right (+) lis 0;;
+```
+
+I tre parametri: `f`, la funzione da applicare a ogni passo; `lis`, la lista; `a`, il risultato per la lista vuota (sta *a destra* della lista). A ogni passo `f` riceve l'elemento corrente e il risultato già calcolato sul resto della lista. Altri esempi:
+
+```ocaml
+let concat lis = fold_right (^) lis "";;
+concat ["abc"; "def"; "gh"];;     (* - : string = "abcdefgh" *)
+let minimo_massimo lis =
+  let f x (min, max) =
+    if x < min then (x, max) else if x > max then (min, x) else (min, max)
+  in match lis with
+  | [] -> (0, 0)
+  | x :: lis' -> fold_right f lis' (x, x);;
+minimo_massimo [3; 2; 4];;        (* - : int * int = (2, 4) *)
+```
+
+In `minimo_massimo` si porta dietro una *coppia* (minimo e massimo finora). Per il caso base non c'è un valore giusto per tutte le liste, quindi si stacca il primo elemento e si parte da `(x, x)`.
+
+La somma si può scrivere anche al contrario, con il risultato parziale passato *come parametro* (un accumulatore, che parte da 0):
+
+```ocaml
+let rec somma a lis = match lis with
+  | [] -> a
+  | x :: lis' -> somma (a + x) lis';;
+```
+
+```
+somma 0 [3; 2; 4] = somma (0 + 3) [2; 4]
+                  = somma ((0 + 3) + 2) [4]
+                  = somma (((0 + 3) + 2) + 4) []  =  9
+```
+
+Ora gli elementi si sommano *dal primo all'ultimo*, cioè da sinistra, e la funzione è ricorsiva in coda. Il disegno mostra lo stack nei due casi: a sinistra ogni chiamata lascia in sospeso un'addizione, e i risultati (in rosso) risalgono; a destra non c'è niente in sospeso, il risultato scende già fatto e basta un record riusato.
+
+#figura(canvas(length: 1cm, {
+  import draw: *
+  let cs = ("somma [3; 2; 4]", "somma [2; 4]", "somma [4]", "somma []")
+  let sosp = ("3 + □", "2 + □", "4 + □", "")
+  let ris = ("9", "6", "4", "0")
+  for i in range(4) {
+    let y = -i * 1.1
+    rect((0, y), (3.6, y + 0.75), fill: if i == 3 { rgb("#eefaf2") } else { white })
+    content((1.8, y + 0.52), text(8pt, raw(cs.at(i))))
+    content((1.8, y + 0.2), text(8pt, fill: gray, sosp.at(i)))
+    if i < 3 { line((1.2, y), (1.2, y - 0.35), mark: (end: "stealth")) }
+    content((4.2, y + 0.37), text(9pt, fill: red, ris.at(i)))
+    if i > 0 { line((4.2, y + 0.6), (4.2, y + 1.25), stroke: red, mark: (end: "stealth")) }
+  }
+  let ca = ("somma 0 [3; 2; 4]", "somma 3 [2; 4]", "somma 5 [4]", "somma 9 []")
+  for i in range(4) {
+    let y = -i * 1.1
+    rect((6.3, y), (10.2, y + 0.75), stroke: if i == 0 { black } else { (dash: "dashed", paint: gray) })
+    content((8.25, y + 0.37), text(8pt, raw(ca.at(i))))
+    if i < 3 { line((8.25, y), (8.25, y - 0.35), mark: (end: "stealth")) }
+  }
+  content((10.8, -2.93), text(9pt, fill: red)[9])
+  content((1.8, 1.2), text(9pt)[*non in coda*: 4 record])
+  content((8.25, 1.2), text(9pt)[*in coda*: 1 record riusato])
+}), [Lo stack di `somma [3; 2; 4]` nelle due versioni; in grigio l'addizione in sospeso])
+
+Lo schema è $f (... (f (f a x_1) x_2) ...) x_n$, ed è la *`fold_left`*:
+
+```ocaml
+let rec fold_left f a lis = match lis with
+  | [] -> a
+  | x :: lis' -> fold_left f (f a x) lis';;
+(* val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a *)
+let somma lis = fold_left (+) 0 lis;;
+let stringa_piu_lunga lis =
+  let f s x = if String.length x > String.length s then x else s in
+  fold_left f "" lis;;
+stringa_piu_lunga ["ciao"; "hello"; "hi"];;   (* - : string = "hello" *)
+```
+
+Qui il valore iniziale `a` sta *a sinistra* della lista, e anche in `f` l'accumulatore è il primo parametro. Regola per ricordarlo: in `fold_X` l'accumulatore sta a `X` (_left_ o _right_), sia fra i parametri della fold sia fra quelli di `f`. Gli alberi delle due fold su `[x1; x2; x3]`:
+
+#align(center, grid(columns: 2, column-gutter: 4em, align: bottom,
+  [#albero(([$f$], [$x_1$], ([$f$], [$x_2$], ([$f$], [$x_3$], [$a$])))) #align(center, text(9pt)[`fold_right f [x1; x2; x3] a`])],
+  [#albero(([$f$], ([$f$], ([$f$], [$a$], [$x_1$]), [$x_2$]), [$x_3$])) #align(center, text(9pt)[`fold_left f a [x1; x2; x3]`])],
+))
+
+Le due fold *non sono intercambiabili*:
+
+#align(center, table(columns: 3, align: left,
+  [], [`fold_right f lis a`], [`fold_left f a lis`],
+  [Ordine], [dall'ultimo elemento al primo], [dal primo all'ultimo],
+  [Tipo di `f`], [`'a -> 'b -> 'b`: elemento, accumulatore], [`'a -> 'b -> 'a`: accumulatore, elemento],
+  [In coda?], [no: dopo la chiamata resta da applicare `f`], [sì: un solo record nello stack],
+  [Con `(-)` su `[1; 2; 3]`, da 0], [$1 - (2 - (3 - 0)) = 2$], [$((0 - 1) - 2) - 3 = -6$],
+  [Con `f` che fa `x :: l`, da `[]`], [`[1; 2; 3]`: la copia], [`[3; 2; 1]`: la rovescia],
+))
+
+Con `(-)` i risultati cambiano perché la sottrazione non è associativa. Nell'ultima riga `::` mette sempre in testa: `fold_right` comincia da 3 e mette davanti 2 e poi 1, quindi ricostruisce la lista nello stesso ordine; `fold_left` comincia da 1 e ci mette davanti 2 e poi 3, quindi la rovescia.
+
+Altri due esempi. `somma_dal_fondo` costruisce la lista delle somme a partire dal fondo: se la lista accumulata non è vuota, somma l'elemento corrente al suo primo elemento e mette il risultato in testa.
+
+```ocaml
+let somma_dal_fondo lis =
+  let f x l = match l with
+    | [] -> [x]
+    | x' :: _ -> (x + x') :: l
+  in fold_right f lis [];;
+somma_dal_fondo [2; 2; 2; 2; 2];;   (* - : int list = [10; 8; 6; 4; 2] *)
+```
+
+`crescente` controlla se la lista è ordinata. `f` legge un elemento alla volta, ma qui serve confrontare due elementi *consecutivi*: allora nell'accumulatore, insieme al risultato `b`, si porta dietro l'elemento precedente `prec`.
+
+```ocaml
+let crescente lis =
+  let f (prec, b) x = (x, b && prec <= x) in
+  match lis with
+  | [] -> true
+  | x :: lis' -> let (_, b) = fold_left f (x, true) lis' in b;;
+crescente [1; 4; 4; 6; 9];;   (* - : bool = true *)
+crescente [3; 5; 4; 7; 9];;   (* - : bool = false *)
+```
+
+Con `fold_left`, che va dal primo all'ultimo, `prec` è proprio l'elemento prima; con `fold_right` sarebbe quello dopo. La fold scorre comunque *tutta* la lista, anche quando `b` è già `false`: per fermarsi alla prima coppia fuori ordine serve una ricorsione scritta a mano.
+
+Tutte queste funzioni sono già nel modulo `List`: `List.exists`, `List.for_all`, `List.filter`, `List.map`, `List.fold_right`, `List.fold_left`. Ce ne sono molte altre, come `List.find`, `List.sort`, `List.partition`, `List.merge`, `List.mem`. Si combinano facilmente: per sommare i numeri pari di una lista moltiplicati per 3, prima si filtrano i pari, poi si moltiplicano, poi si sommano.
+
+```ocaml
+let somma_pari_per_3 lis =
+  let pari = List.filter (fun x -> x mod 2 = 0) lis in
+  let per_3 = List.map (fun x -> x * 3) pari in
+  List.fold_left (+) 0 per_3;;
+somma_pari_per_3 [1; 2; 3; 4; 5; 6];;   (* - : int = 36 *)
+```
+
+Anche l'area del poligono diventa più corta, ma più difficile da leggere:
+
+```ocaml
+let area pol =
+  let f (x1, y1) ((x2, y2), (ris1, ris2)) =
+    ((x1, y1), (ris1 + x1 * y2, ris2 + x2 * y1)) in
+  let (_, (ris1, ris2)) = List.fold_right f pol (List.hd pol, (0, 0)) in
+  float_of_int (ris1 - ris2) /. 2.;;
+```
+
++ `fold_right` scorre i vertici dall'ultimo al primo. L'accumulatore è una coppia di coppie: il vertice *dopo* quello corrente, `(x2, y2)`, e le due somme parziali `(ris1, ris2)`.
++ Si parte da `List.hd pol`, il primo vertice, che fa da "vertice dopo" l'ultimo (senza copiarlo in fondo), e dalle somme `(0, 0)`.
++ A ogni passo `f` aggiunge i due prodotti e restituisce come "vertice dopo" quello corrente, che servirà al passo successivo.
++ Alla fine si butta il vertice (`_`) e si usano le due somme.
+
+Le stesse funzioni ci sono, almeno in parte, anche in altri linguaggi: in JavaScript gli array hanno `map`, `filter` e `reduce` (che è la `fold_left`, per esempio `[1, 2, 3, 4].reduce((acc, x) => acc + x)` dà 10); in Java ci sono dalla versione 8, insieme alle lambda expressions.
+
+#esercizio(16)[Risolvere l'#link(<es-13>)[esercizio 13] usando le funzioni `fold_left` o `fold_right`.]
+
+#esercizio(17)[Risolvere l'#link(<es-15>)[esercizio 15] usando le funzioni higher-order su liste viste a lezione.]
+
+#esercizio(18)[Utilizzando le funzioni higher-order su liste, scrivere una funzione `massimo_unico` che, data una lista `lis`, restituisca `true` se il valore massimo in `lis` è unico, e `false` se `lis` contiene più di una istanza del suo valore massimo, oppure se `lis` è vuota.]
+
 #set heading(numbering: none)
 
 = Riepilogo delle regole
@@ -1378,6 +2286,33 @@ Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è 
   [*Progresso*: se $emptyset tack.r e : tau$ allora $e$ è un valore oppure $e arrow.r e'$],
   [*Conservazione*: se $Gamma tack.r e : tau$ e $e arrow.r e'$ allora $Gamma tack.r e' : tau$],
   [*Lemma di sostituzione*: se $Gamma, x : tau_1 tack.r e_3 : tau_2$ e $Gamma tack.r e_2 : tau_1$ allora $Gamma tack.r e_3 {x := e_2} : tau_2$])
+]
+
+#text(9.5pt)[
+#align(center, table(columns: 3, align: left,
+  [Costrutto OCaml], [Cosa fa], [In C / JavaScript],
+  [`let x = e;;`], [lega il nome `x` al valore di `e`, per sempre], [`const x = e;`],
+  [`let x = e in e'`], [`x` vale solo dentro `e'`], [variabile in un blocco `{ }`],
+  [`fun x y -> e`], [funzione anonima, curried], [`(x, y) => e`],
+  [`let f x y = e`], [funzione con nome], [`function f(x, y) { return e; }`],
+  [`let rec f x = e`], [funzione ricorsiva (`and` per le mutue)], [ogni funzione C può essere ricorsiva],
+  [`function | P -> e ...`], [funzione che fa subito il match sull'ultimo parametro], [],
+  [`if c then e1 else e2`], [espressione, rami dello stesso tipo, `else` obbligatorio], [`c ? e1 : e2`],
+  [`match e with | P -> e1 | _ -> e2`], [primo pattern che combacia; `_` combacia con tutto], [`switch`, ma sulla forma],
+  [`(x, y)`, `let (x, y) = p`], [tupla e sua destrutturazione], [`struct` senza nomi],
+  [`[]`, `x :: l`, `l1 @ l2`], [lista vuota, cons, concatenazione (copia `l1`)], [],
+  [`(+.)`, `(x : int)`, `'a`], [operatore prefisso, annotazione di tipo, variabile di tipo], [`(int) x` è un cast, non un'annotazione],
+))
+
+#align(center, table(columns: 3, align: left,
+  [Funzione (in `List`)], [Tipo], [Risultato],
+  [`exists p l`], [`('a -> bool) -> 'a list -> bool`], [qualche elemento soddisfa `p`],
+  [`for_all p l`], [`('a -> bool) -> 'a list -> bool`], [tutti gli elementi soddisfano `p`],
+  [`filter p l`], [`('a -> bool) -> 'a list -> 'a list`], [gli elementi che soddisfano `p`],
+  [`map f l`], [`('a -> 'b) -> 'a list -> 'b list`], [`[f x1; ...; f xn]`],
+  [`fold_right f l a`], [`('a -> 'b -> 'b) -> 'a list -> 'b -> 'b`], [`f x1 (f x2 (... (f xn a)))`],
+  [`fold_left f a l`], [`('a -> 'b -> 'a) -> 'a -> 'b list -> 'a`], [`f (... (f (f a x1) x2) ...) xn`, in coda],
+))
 ]
 
 = Soluzioni degli esercizi
@@ -1512,4 +2447,106 @@ Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è 
   Valutazione: l'argomento è un valore, quindi un passo di App:
   $ arrow.r (fun x : B = Apply(f, x)){f := fun x : B = x} = fun x : B = Apply(fun x : B = x, x) $
   Nessuna cattura: $fun x : B = x$ non ha variabili libere. Il risultato è una funzione, quindi un valore, e ha ancora tipo $B arrow.r B$ (conservazione).
+]
+
+#soluzione(12)[
+  A. `(int * float) list`. Gli elementi sono coppie con un `int` e un `float`, e `[]` (tipo `'a list`) si unifica con la lista che gli si costruisce davanti.
+
+  B. `'a list list`. `[] :: []` è la lista che contiene una lista vuota, `[[]]`: l'elemento è una `'a list` e nessuno fissa `'a`.
+
+  C. `bool -> int -> bool * bool`. Con i vincoli, il tipo ha la forma `X -> Y -> RIS`:
+  - `y > 0` confronta `y` con un `int`, quindi `Y = int`;
+  - i rami dell'`if` sono `x` e `y < 10`, che è un `bool`: devono avere lo stesso tipo, quindi `X = bool`;
+  - il risultato è la coppia `(x, if ...)`, quindi `RIS = X * bool = bool * bool`.
+
+  D. `int -> int`. La funzione ha tipo `int -> int -> int` (per `+`); dandole il primo argomento resta una funzione che aspetta il secondo (applicazione parziale).
+
+  E. `bool -> int * int -> int -> int list`. Il tipo ha la forma `X -> Y -> Z -> RIS`:
+  - `x` è la condizione dell'`if`, quindi `X = bool`;
+  - `y` fa match con `(0, 0)`, quindi `Y = int * int`, e `n1`, `n2` sono `int`;
+  - `[n1; n2]` è una `int list`, e `z :: [n1; n2]` vuole `Z = int`;
+  - il ramo `then` è `[]` (`'a list`) e il ramo del match è una `int list`: unificati, `RIS = int list`.
+
+  F. `int -> 'a list -> 'a -> 'a list`. Il tipo ha la forma `X -> Y -> Z -> RIS`:
+  - `x = k` con `k = 10`, quindi `X = int`;
+  - i rami sono `y` e `[z]`, quindi `Y = Z list` e `RIS = Y`;
+  - niente fissa `Z`: diventa `'a`.
+]
+
+#soluzione(13)[
+```ocaml
+let rec somma_positivi lis = match lis with
+  | [] -> 0
+  | x :: lis' ->
+      if x > 0 then x + somma_positivi lis' else somma_positivi lis';;
+somma_positivi [3; 0; -1; 2; -4];;   (* - : int = 5 *)
+```
+Lo schema di `somma`, ma gli elementi non positivi non si sommano: si passa direttamente al resto.
+]
+
+#soluzione(14)[
+```ocaml
+let somma_liste lis1 lis2 =
+  let rec somma l1 l2 = match (l1, l2) with
+    | (x :: l1', y :: l2') -> (x + y) :: somma l1' l2'
+    | _ -> []
+  in
+  if List.length lis1 = List.length lis2 then somma lis1 lis2 else [];;
+somma_liste [1; 2; 3] [10; 20; 30];;   (* - : int list = [11; 22; 33] *)
+somma_liste [1; 2] [3];;               (* - : int list = [] *)
+```
+Si fa il match sulla coppia delle due liste: finché tutte e due hanno un primo elemento, si sommano. La trappola: senza il controllo sulle lunghezze, `somma [1; 2] [3]` darebbe `[4]` (si ferma quando finisce la lista più corta) e non `[]` come chiede il testo. Per questo le lunghezze si confrontano prima, con `List.length`.
+]
+
+#soluzione(15)[
+```ocaml
+let parentesi_bilanciate lis =
+  let rec conta aperte lis = match lis with
+    | [] -> aperte = 0
+    | '(' :: lis' -> conta (aperte + 1) lis'
+    | ')' :: lis' -> aperte > 0 && conta (aperte - 1) lis'
+    | _ :: lis' -> conta aperte lis'
+  in conta 0 lis;;
+```
+L'accumulatore `aperte` conta le parentesi aperte e non ancora chiuse. La sequenza è bilanciata se:
++ non si chiude mai una parentesi quando non ce ne sono di aperte (`aperte > 0` prima di ogni `')'`);
++ alla fine non ne resta nessuna aperta (`aperte = 0`).
+
+La prima condizione serve: `[')'; '(']` ha tante aperte quante chiuse, ma non è bilanciata, e infatti dà `false`. Gli altri caratteri si saltano (ultimo ramo). Sui due esempi del testo dà `true` e `false`.
+]
+
+#soluzione(16)[
+```ocaml
+let somma_positivi lis =
+  List.fold_left (fun a x -> if x > 0 then a + x else a) 0 lis;;
+```
+L'accumulatore `a` parte da 0, e a ogni elemento cresce solo se l'elemento è positivo.
+]
+
+#soluzione(17)[
+```ocaml
+let parentesi_bilanciate lis =
+  let f n c =
+    if n < 0 then n
+    else if c = '(' then n + 1
+    else if c = ')' then n - 1
+    else n
+  in List.fold_left f 0 lis = 0;;
+```
+Il contatore `n` è quello dell'esercizio 15. Quando una `')'` arriva senza parentesi aperte, `n` diventa $-1$ e da lì *non cambia più* (primo `if`): la fold non si può fermare a metà, quindi il negativo fa da segnale di errore fino alla fine. Il risultato è `true` solo se si arriva in fondo con `n = 0`. Su `[')'; '(']` si ha $0 arrow.r -1 arrow.r -1$, quindi `false`.
+]
+
+#soluzione(18)[
+```ocaml
+let massimo_unico lis = match lis with
+  | [] -> false
+  | x :: lis' ->
+      let m = List.fold_left (fun a y -> if y > a then y else a) x lis' in
+      List.length (List.filter (fun y -> y = m) lis) = 1;;
+massimo_unico [3; 7; 2];;   (* - : bool = true *)
+massimo_unico [7; 3; 7];;   (* - : bool = false *)
+```
++ La lista vuota non ha massimo: `false`.
++ Il massimo `m` si trova con una `fold_left` che parte dal primo elemento, come in `minimo_massimo`.
++ `filter` tiene gli elementi uguali a `m`: il massimo è unico se ne resta esattamente uno.
 ]
