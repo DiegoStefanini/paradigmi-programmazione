@@ -27,4 +27,6 @@ Capitoli della dispensa: 1 «Il lambda calcolo» (sintassi, strategie CBV/CBN, c
 
 Nota: nel PDF λ è un glifo che `pdftotext` rende come "l": nella dispensa scrivere sempre λ (`$lambda$`).
 
-Fin dove si è arrivati: λ-calcolo chiuso (fine di `Sistemi di tipo e Lambda calcolo tipato.pdf`). Manca tutto **OCaml** (i due capitoli sopra) e gli esercizi svolti: `Prima Esercitazione sul Lambda Calcolo.pdf`, `Esercizi Lambda Calcolo 2.pdf`, `Esercizi prima esercitazione su OCAML.pdf` (la prof non dà le soluzioni).
+Fin dove si è arrivati: λ-calcolo chiuso (fine di `Sistemi di tipo e Lambda calcolo tipato.pdf`), con obiettivi per capitolo, esercizi 1-11 (i due fogli λ e gli esercizi delle slide) risolti nell'appendice «Soluzioni» e appendice «Riepilogo delle regole». Manca tutto **OCaml** (i due capitoli sopra) e `Esercizi prima esercitazione su OCAML.pdf`.
+
+Nomi delle regole: quelli dell'Appendice B della dispensa della prof (App, CV-App, If-Cond, T-App, T-Fun…). Esercizi: `#esercizio(n)[…]` nel testo, `#soluzione(n)[…]` in fondo, stesso numero. Le riduzioni si verificano con `python3 -I esercizi/lambda.py "<termine>" no|cbv|cbn` (in CBV è valore tutto ciò che non si riduce, anche una variabile libera). Il codice OCaml si prova con `podman run --rm -i docker.io/ocaml/opam:debian-12-ocaml-5.2 ocaml`.

@@ -78,6 +78,21 @@
 // regola con nome a destra
 #let centro(x) = pad(y: 0.6em, align(center, x))
 #let inf(sopra, sotto, nome) = $regola(sopra, sotto) #text(8pt, fill: gray)[(#nome)]$
+// regole in griglia, n per riga
+#let rg(n, ..x) = align(center, grid(columns: (auto,) * n, column-gutter: 1.6em, row-gutter: 1.1em, align: center + bottom, ..x.pos()))
+// assioma (regola senza premesse) con nome
+#let ax(f, nome) = $#f #h(0.4em) #text(8pt, fill: gray)[(#nome)]$
+// esercizio nel testo, con il rimando alla soluzione in fondo (stesso numero in #soluzione)
+#let esercizio(n, body) = block(breakable: false, stroke: (left: 3pt + rgb("#e08a00")), fill: rgb("#fff6e6"), inset: 10pt, width: 100%)[
+  *Esercizio #n* #h(1fr) #link(label("sol-" + str(n)), text(8pt)[soluzione a pag. #context counter(page).at(label("sol-" + str(n))).first() →]) \ #body]
+#let soluzione(n, body) = block(inset: (bottom: 6pt), width: 100%)[
+  #metadata(n) #label("sol-" + str(n))
+  #text(fill: rgb("#e08a00"))[*Esercizio #n*] \ #body]
+// "cosa devi saper fare" all'inizio di un capitolo
+#let obiettivi(..voci) = block(stroke: 1pt + luma(150), radius: 4pt, inset: 10pt, width: 100%)[
+  *Cosa devi saper fare* #list(..voci.pos())]
+// enunciato importante (teorema, lemma, definizione chiave)
+#let teorema(titolo, body) = block(stroke: 1pt + blu, radius: 4pt, inset: 10pt, width: 100%)[*#titolo.* #body]
 // riquadro con un insieme di regole
 #let regole(titolo, colore, ..r) = box(stroke: 1pt + colore, inset: 9pt, radius: 4pt, width: 100%, align(center)[
   #text(fill: colore, weight: "bold", titolo) #v(0.2em)
@@ -99,6 +114,16 @@
 #outline(depth: 2)
 
 = Il lambda calcolo
+
+#obiettivi(
+  [mettere le parentesi sottintese e disegnare l'albero di un termine],
+  [trovare le variabili libere e legate, calcolare FV],
+  [fare una sostituzione con l'α-conversione quando serve],
+  [trovare i redex e ridurre fino alla forma normale, o accorgersi che la riduzione non termina],
+  [ridurre con call-by-value e call-by-name e dire in cosa differiscono],
+  [dimostrare che due termini sono β-equivalenti],
+  [usare Y per la ricorsione e calcolare con le codifiche (booleani, IF, numerali di Church)],
+)
 
 == Calcolabilità e paradigmi
 
@@ -277,7 +302,7 @@ Senza parentesi $lambda x. x y$ è ambiguo: è $lambda x. (x y)$ (prende $x$ e r
     $e_1 e_2 e_3$ #h(0.3em) è #h(0.3em) $(e_1 e_2) e_3$],
 )
 
-*Esercizio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
+*Esempio*: quali parentesi sono sottintese in $lambda x. x lambda y. x y z$?
 + Regola 1. Il corpo di $lambda x$ è tutto il resto, $x lambda y. x y z$; dentro, il corpo di $lambda y$ è $x y z$: #h(0.3em) $lambda x. (x lambda y. (x y z))$
 + Regola 2. $x y z$ diventa $(x y) z$; e $x lambda y. dots$ è $x$ applicata alla funzione $lambda y. dots$: #h(0.3em) $lambda x. (x (lambda y. ((x y) z)))$
 
@@ -334,7 +359,7 @@ Le variabili libere si possono definire in modo preciso, con una *definizione in
 
 FV sta per _Free Variables_. Una variabile che non è libera è *legata* (_bound_). Un termine senza variabili libere ($"FV"(e) = emptyset$) si dice *chiuso*; i termini chiusi si chiamano *combinatori*, il più semplice è l'identità $lambda x. x$.
 
-*Esercizio*: $"FV"((lambda x. lambda y. x y)((lambda z. z) k))$
+*Esempio*: $"FV"((lambda x. lambda y. x y)((lambda z. z) k))$
 $ = "FV"(lambda x. lambda y. x y) union "FV"((lambda z. z) k) = emptyset union {k} = {k} $
 
 Cambiare nome a un parametro non cambia niente: $lambda a. a c$ e $lambda b. b c$ si dicono *α-equivalenti*, perché $a$ e $b$ contano solo per il *ruolo* che hanno nell'espressione. Lo stesso vale nei linguaggi:
@@ -351,6 +376,13 @@ Espressioni α-equivalenti rappresentano *lo stesso programma*. Rinominare una v
   legami(("λ", "x", ".", "x", "(", "λ", "z", ".", "z", ")", "x"), ((1, 3), (6, 8), (1, 10))),
 ))
 #align(center, text(9pt)[i due termini sono equivalenti a meno di α-conversione, ma nel secondo ogni nome ha un solo significato])
+
+#nota[Il nome nuovo deve essere *fresco*. $lambda x. x y$ e $lambda y. y y$ *non* sono α-equivalenti: nel primo la $y$ è libera, nel secondo è stata catturata dal $lambda y$ ed è diventata il parametro. La prima funzione applica l'argomento a $y$, la seconda applica l'argomento a se stesso.]
+
+#esercizio(1)[Trovare le variabili libere (prima mettere le parentesi sottintese): \
+  a. $(lambda x. x)(lambda y. x x)(lambda y. y) y$ \
+  b. $(lambda x. x k)((lambda x. lambda y. x y)(lambda z. (lambda x. z) y))$ \
+  c. $x (lambda x. (lambda y. y y) x) y$]
 
 == Sostituzione e β-riduzione
 
@@ -393,7 +425,7 @@ Un esempio completo: $(lambda x. lambda y. ((lambda z. z) x)) y$. Il passo $(lam
 
 $ (lambda y. ((lambda z. z) x)){x := y} attach(equiv, br: alpha) (lambda k. ((lambda z. z) x)){x := y} = lambda k. ((lambda z. z) y) $
 
-*Esercizi*. L'espressione è sempre la stessa, cambia la variabile da sostituire ($attach(equiv, br: alpha)$ vuol dire "α-equivalente", cioè uguale a meno di rinominare):
+*Esempi*. L'espressione è sempre la stessa, cambia la variabile da sostituire ($attach(equiv, br: alpha)$ vuol dire "α-equivalente", cioè uguale a meno di rinominare):
 
 #table(columns: (auto, 1fr), align: left,
   [Sostituzione], [Risultato],
@@ -401,6 +433,11 @@ $ (lambda y. ((lambda z. z) x)){x := y} attach(equiv, br: alpha) (lambda k. ((la
   [$((lambda x. y x) w){y := lambda k. k x}$], [$attach(equiv, br: alpha) ((lambda z. y z) w){y := lambda k. k x} = (lambda z. (lambda k. k x) z) w$ \ #text(9pt)[la $x$ di $lambda k. k x$ è libera e verrebbe catturata da $lambda x$: rinomino]],
   [$((lambda x. y x) w){w := lambda k. k x}$], [$(lambda x. y x)(lambda k. k x)$ #h(0.5em) #text(9pt)[$w$ non è sotto nessun $lambda$: caso applicazione]],
 )
+
+#esercizio(2)[Calcolare le sostituzioni (che evitano la cattura): \
+  a. $(lambda y. x y){x := y}$ \
+  b. $(lambda y. x y){x := lambda y. y}$ \
+  c. $(lambda y. x y){x := lambda x. x y}$]
 
 Con la sostituzione si scrive la regola fondamentale del λ-calcolo, la *β-riduzione*:
 
@@ -441,6 +478,11 @@ Il λ-calcolo è di *ordine superiore*: una funzione può prendere funzioni come
   [$(lambda x. lambda y. x y) z k$], [$arrow.r (lambda y. z y) k arrow.r z k$],
 ))
 
+#esercizio(3)[Trovare tutti i redex: \
+  a. $(lambda x. x)((lambda x. x)(lambda z. (lambda x. x) z))$ \
+  b. $(lambda x. x)(lambda x. x x)(lambda y. y)$ \
+  c. $x ((lambda x. (lambda y. y y) x) y)$]
+
 La valutazione va avanti scegliendo un redex e riducendolo. Quando non ci sono più redex l'espressione è in *forma normale β*: non si può più riscrivere con la β-riduzione, ed è il *risultato finale*, il *valore calcolato*. Per esempio $lambda x. x$ e $lambda t. lambda f. t$ sono valori: *le funzioni sono valori*.
 
 #align(center, table(columns: 2, align: left,
@@ -469,6 +511,11 @@ Un passo di β-riduzione è un passo di calcolo, quindi $arrow.r.double$ (la *ch
 #align(center, text(9pt)[β-equivalenti per il terzo caso: tutte e due si riducono a $z$])
 
 *Intuizione*: due espressioni sono β-equivalenti quando sono indistinguibili dal punto di vista del calcolo, cioè calcolano gli stessi risultati.
+
+#esercizio(4)[Dimostrare le β-equivalenze, con meno passi possibile: \
+  a. $(lambda x. x)(lambda y. y) z attach(equiv, br: beta) (lambda x. (lambda k. k)) w z$ \
+  b. $(lambda x. x)(lambda y. y) attach(equiv, br: beta) (lambda y. y)(lambda x. x)$ \
+  c. $(lambda x. lambda y. x y) y attach(equiv, br: beta) (lambda x. (lambda x. x)(lambda z. y z)) k$]
 
 == Ordine di riduzione e strategie
 
@@ -502,7 +549,9 @@ Ma in generale l'ordine di valutazione può cambiare il risultato finale? Un alt
   line((0, -3.65), (0, -4.25), mark: (end: "stealth"))
 }), [Scegliendo prima il redex esterno si copia $(lambda y. y) 5$ e lo si riduce due volte; prima quello interno, una volta sola. Il risultato è lo stesso])
 
-La risposta generale è il *teorema di Church-Rosser*: l'ordine in cui si scelgono le β-riduzioni *non influisce sul risultato finale*. Più precisamente: se a una stessa espressione si possono applicare due riduzioni (o sequenze di riduzioni) diverse, esiste un'espressione raggiungibile da entrambi i risultati con altre riduzioni (anche nessuna).
+La risposta generale è il teorema di Church-Rosser: l'ordine in cui si scelgono le β-riduzioni *non influisce sul risultato finale*.
+
+#teorema[Teorema di Church-Rosser][Se $e arrow.r.double e_1$ e $e arrow.r.double e_2$, allora esiste $e'$ con $e_1 arrow.r.double e'$ e $e_2 arrow.r.double e'$. Cioè: se da una stessa espressione si fanno due sequenze di riduzioni diverse, c'è sempre un'espressione raggiungibile da entrambi i risultati (anche con zero passi).]
 
 #grid(columns: (auto, 1fr), gutter: 2em, align: horizon,
 figura(canvas(length: 1cm, {
@@ -579,22 +628,15 @@ Una *strategia di valutazione* fissa quale scelta fare. Valutare un'applicazione
 
 Le strategie si scrivono con *regole*: sopra la riga l'ipotesi, sotto la conclusione. La prima a sinistra dice: se $e_1$ fa un passo e diventa $e'$, allora $e_1 e_2$ diventa $e' e_2$.
 
-#grid(columns: (1.25fr, 1fr, 1fr), gutter: 0.6em,
-  regole([Standard (senza strategia)], red,
-    $(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$,
-    [#regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$) #h(0.8em) #regola($e_2 arrow.r e'$, $e_1 e_2 arrow.r e_1 e'$)],
-    regola($e arrow.r e'$, $lambda x. e arrow.r lambda x. e'$)),
-  regole([Call-by-value], verde,
-    $(lambda x. e_1) v_2 arrow.r e_1 {x := v_2}$,
-    regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$),
-    regola($e_2 arrow.r e'$, $v_1 e_2 arrow.r v_1 e'$)),
-  regole([Call-by-name], blu,
-    $(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$,
-    regola($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$)),
-)
+#regole([Standard (senza strategia)], red,
+  rg(2, ax($(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$, "App"), inf($e arrow.r e'$, $lambda x. e arrow.r lambda x. e'$, "App-Body")), rg(2, inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "App-1"), inf($e_2 arrow.r e'$, $e_1 e_2 arrow.r e_1 e'$, "App-2")))
+#regole([Call-by-value], verde,
+  rg(3, ax($(lambda x. e_1) v_2 arrow.r e_1 {x := v_2}$, "CV-App"), inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "CV-App-1"), inf($e_2 arrow.r e'$, $v_1 e_2 arrow.r v_1 e'$, "CV-App-2")))
+#regole([Call-by-name], blu,
+  rg(2, ax($(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$, "CN-App"), inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "CN-App-1")))
 
-- *Standard*: qualsiasi redex si può ridurre in qualsiasi momento, anche dentro il corpo di una funzione (terza riga). Non è deterministica.
-- *Call-by-value*: $v$ sta per un *valore*, cioè un'espressione già valutata. La β-riduzione scatta solo quando l'argomento è un valore $v_2$; l'argomento $e_2$ si riduce solo quando la funzione è già un valore $v_1$.
+- *Standard*: qualsiasi redex si può ridurre in qualsiasi momento, anche dentro il corpo di una funzione (App-Body). Non è deterministica.
+- *Call-by-value*: $v$ sta per un *valore*, cioè un'espressione che non si può più ridurre (una funzione, ma anche una variabile libera come $y$). La β-riduzione scatta solo quando l'argomento è un valore $v_2$; l'argomento $e_2$ si riduce solo quando la funzione è già un valore $v_1$.
 - *Call-by-name*: si riduce la parte funzione finché diventa $lambda x. e_1$, poi si applica. L'argomento non si tocca.
 
 #nota[CBV e CBN *non hanno la regola che riduce il corpo di una funzione*. Quindi $lambda x. ((lambda y. y) z)$ con la riduzione standard diventa $lambda x. z$, con le due strategie resta così com'è: per loro una funzione è già un valore, anche se dentro ha un redex. È quello che succede nei linguaggi: il corpo di una funzione non viene eseguito finché la funzione non viene chiamata.]
@@ -622,6 +664,15 @@ Conta quale strategia si sceglie?
 - Se la valutazione termina, *no*: per la confluenza il risultato è lo stesso.
 - La CBV valuta ogni argomento *una volta sola*. La CBN lo valuta *solo se serve*, ma può valutarlo più volte: è la strada di sinistra nella figura di $(lambda x. x + x)((lambda y. y) 5)$.
 - La CBN *termina ogni volta che è possibile*; la CBV può non terminare anche quando la CBN termina. In $(lambda x. y) Omega$ la CBN applica subito $lambda x. y$ e dà $y$; la CBV deve prima valutare l'argomento $Omega$ e non finisce mai. Non contraddice la confluenza, che dice che una strada verso il termine comune *esiste*, non quale strategia la trova.
+
+#esercizio(5)[Ridurre fino alla forma normale, o accorgersi che la riduzione non termina. A ogni passo indicare il redex scelto; se ci sono più scelte, provarle tutte. \
+  a. $(lambda x. lambda y. x y)(lambda z. z y) y$ \
+  b. $(lambda x. lambda y. x y)(lambda x. y y) k$ \
+  c. $(lambda x. (lambda y. x y)(lambda k. k))(x y)$ \
+  d. $(lambda x. y)((lambda y. y y y)(lambda x. x x x))$ \
+  e. $(lambda z. ((lambda x. lambda y. x y) z) z)(lambda z. z z)$]
+
+#esercizio(6)[Ripetere l'esercizio 5 con call-by-value e con call-by-name.]
 
 == Funzioni con più argomenti
 
@@ -786,7 +837,7 @@ $ IF = lambda c. lambda "then". lambda "else". c "then" "else" #h(3em) IF TRUE a
   &arrow.r (lambda f. e_1) e_2 arrow.r e_1
 $)
 
-*Esercizio*: calcolare $IF FALSE e_1 e_2$.
+#esercizio(7)[Calcolare $IF FALSE e_1 e_2$.]
 
 I *numeri naturali* hanno una definizione induttiva: zero è un naturale; se $n$ è un naturale, anche $"Succ" n$ (il successore) lo è. Le operazioni si definiscono allo stesso modo:
 
@@ -818,13 +869,25 @@ $ SUCC C_1 = (lambda n. lambda s. lambda z. s (n s z)) C_1 &arrow.r lambda s. la
   &= lambda s. lambda z. s ((lambda s'. lambda z'. s' z') s z) \
   &arrow.r.double lambda s. lambda z. s (s z) = C_2 $
 
-*Esercizi*:
-+ definire $ISZERO$ in modo che $ISZERO C_0 = TRUE$ e $ISZERO C_i = FALSE$ per $i != 0$; calcolare $ISZERO C_1$;
-+ calcolare $PLUS C_1 C_1$.
+#esercizio(8)[Definire $ISZERO$ in modo che $ISZERO C_0 = TRUE$ e $ISZERO C_i = FALSE$ per $i != 0$; calcolare $ISZERO C_1$.]
+
+#esercizio(9)[a. Calcolare $PLUS C_1 C_1$. Poi dimostrare: \
+  b. $IF (IF FALSE TRUE FALSE) C_1 C_2 attach(equiv, br: beta) C_2$ \
+  c. $PLUS C_2 C_1 attach(equiv, br: beta) C_3$ \
+  d. $TIMES C_2 C_2 attach(equiv, br: beta) C_4$]
 
 Quindi il λ-calcolo è *Turing completo*: con codifiche furbe rappresenta quasi ogni costrutto dei linguaggi. Ma i programmi sarebbero lenti (migliaia di chiamate di funzione), lunghi (centinaia di righe) e difficili da capire. In pratica si usano linguaggi più ricchi, che hanno già le primitive giuste (numeri, booleani, `if`).
 
 = Controllo dei tipi
+
+#obiettivi(
+  [spiegare a cosa servono i tipi e cosa vuol dire type safety],
+  [leggere una regola di inferenza e costruire un albero di derivazione],
+  [dimostrare una proprietà per induzione sulle derivazioni],
+  [valutare passo per passo un'espressione con le regole small-step, dicendo il nome di ogni regola],
+  [dire se un'espressione è ben tipata costruendo l'albero, o mostrare perché l'albero non si può costruire],
+  [enunciare progresso e conservazione e dimostrarli per il caso dell'if],
+)
 
 == Perché servono i tipi
 
@@ -997,23 +1060,23 @@ I *valori* sono i risultati finali: le espressioni che non vanno più calcolate.
 Poi la *semantica*, cioè cosa succede quando un'espressione viene eseguita: un *interprete* scritto con regole di inferenza. Ogni regola dice come fare *un passo* di calcolo $E arrow.r E'$ (semantica _small-step_, a piccoli passi).
 
 #regole([Condizionale], blu,
-  [$iff tt thn E_1 els E_2 arrow.r E_1$ #h(1em) #text(8pt, fill: gray)[(IF-TRUE)] #h(3em) $iff ff thn E_1 els E_2 arrow.r E_2$ #h(1em) #text(8pt, fill: gray)[(IF-FALSE)]],
-  inf($E arrow.r E'$, $iff E thn E_1 els E_2 arrow.r iff E' thn E_1 els E_2$, "IF-COND"))
+  rg(2, ax($iff tt thn E_1 els E_2 arrow.r E_1$, "If-True"), ax($iff ff thn E_1 els E_2 arrow.r E_2$, "If-False")),
+  inf($E arrow.r E'$, $iff E thn E_1 els E_2 arrow.r iff E' thn E_1 els E_2$, "If-Cond"))
 
-IF-COND ha la stessa forma delle regole delle strategie: finché la condizione non è un valore, si calcola la condizione. Quando diventa $tt$ o $ff$ scatta IF-TRUE o IF-FALSE.
+If-Cond ha la stessa forma delle regole delle strategie: finché la condizione non è un valore, si calcola la condizione. Quando diventa $tt$ o $ff$ scatta If-True o If-False.
 
 #regole([Operazioni sui numeri], verde,
-  [#regola($E arrow.r E'$, $succ E arrow.r succ E'$) #h(3em) #regola($m = n + 1$, $succ n arrow.r m$)],
-  [#regola($E arrow.r E'$, $pred E arrow.r pred E'$) #h(2em) $pred 0 arrow.r 0$ #h(2em) #regola($n > 0 quad m = n - 1$, $pred n arrow.r m$)],
-  [#regola($E arrow.r E'$, $isZero E arrow.r isZero E'$) #h(2em) $isZero 0 arrow.r tt$ #h(2em) #regola($n > 0$, $isZero n arrow.r ff$)])
+  rg(2, inf($E arrow.r E'$, $succ E arrow.r succ E'$, "Succ"), inf($m = n + 1$, $succ n arrow.r m$, "SuccNat")),
+  rg(3, inf($E arrow.r E'$, $pred E arrow.r pred E'$, "Pred"), ax($pred 0 arrow.r 0$, "PredZero"), inf($n > 0 quad m = n - 1$, $pred n arrow.r m$, "PredNat")),
+  rg(3, inf($E arrow.r E'$, $isZero E arrow.r isZero E'$, "IsZero"), ax($isZero 0 arrow.r tt$, "IsZeroZero"), inf($n > 0$, $isZero n arrow.r ff$, "IsZeroSucc")))
 
 Lo schema è sempre lo stesso: la regola a sinistra calcola l'argomento finché diventa un numero $n$, le altre fanno l'operazione. $pred 0$ dà $0$: non ci sono numeri negativi.
 
 Passo dopo passo, `if isZero 0 then 2 else pred 1` si calcola così:
 
 #centro(stack(spacing: 0.9em,
-  inf($isZero 0 arrow.r tt$, $iff isZero 0 thn 2 els pred 1 arrow.r iff tt thn 2 els pred 1$, "IF-COND"),
-  [$iff tt thn 2 els pred 1 arrow.r 2$ #text(8pt, fill: gray)[ #h(0.5em) (IF-TRUE)]]))
+  inf($isZero 0 arrow.r tt$, $iff isZero 0 thn 2 els pred 1 arrow.r iff tt thn 2 els pred 1$, "If-Cond"),
+  [$iff tt thn 2 els pred 1 arrow.r 2$ #text(8pt, fill: gray)[ #h(0.5em) (If-True)]]))
 
 Finora l'interprete sa solo calcolare. Ora gli aggiungiamo i *tipi*: solo due, $"Bool"$ e $"Nat"$ (i numeri).
 
@@ -1022,9 +1085,9 @@ Finora l'interprete sa solo calcolare. Ora gli aggiungiamo i *tipi*: solo due, $
 Il controllo dei tipi è una relazione fra espressioni e tipi, scritta $E : T$ ("$E$ ha tipo $T$"). È definita da regole di inferenza, una per ogni forma sintattica: il metodo è *sintattico*, per induzione sulla struttura del programma.
 
 #regole([Regole di tipo], blu,
-  [#inf($$, $tt : "Bool"$, "T-TRUE") #h(2em) #inf($$, $ff : "Bool"$, "T-FALSE") #h(2em) #inf($$, $n : "Nat"$, "T-NAT")],
-  [#inf($E : "Bool" quad E_1 : T quad E_2 : T$, $iff E thn E_1 els E_2 : T$, "T-IF")],
-  [#inf($E : "Nat"$, $succ E : "Nat"$, "T-SUCC") #h(1.5em) #inf($E : "Nat"$, $pred E : "Nat"$, "T-PRED") #h(1.5em) #inf($E : "Nat"$, $isZero E : "Bool"$, "T-ISZERO")])
+  [#inf($$, $tt : "Bool"$, "T-True") #h(2em) #inf($$, $ff : "Bool"$, "T-False") #h(2em) #inf($$, $n : "Nat"$, "T-Nat")],
+  [#inf($E : "Bool" quad E_1 : T quad E_2 : T$, $iff E thn E_1 els E_2 : T$, "T-If")],
+  [#inf($E : "Nat"$, $succ E : "Nat"$, "T-Succ") #h(1.5em) #inf($E : "Nat"$, $pred E : "Nat"$, "T-Pred") #h(1.5em) #inf($E : "Nat"$, $isZero E : "Bool"$, "T-IsZero")])
 
 La relazione di tipo è la *più piccola* relazione che soddisfa tutte le istanze di queste regole. Un'espressione $E$ è *ben tipata* (_well-typed_) se esiste un $T$ con $E : T$; altrimenti è _ill-typed_.
 
@@ -1032,8 +1095,8 @@ La relazione di tipo è la *più piccola* relazione che soddisfa tutte le istanz
 
 #let tn(t, n) = inf($$, t, n)
 #centro(text(9pt, inf(
-  [#tn($0 : "Nat"$, "T-NAT") #h(0.4em) #inf($0 : "Nat"$, $isZero 0 : "Bool"$, "T-ISZERO") #h(0.4em) #tn($2 : "Nat"$, "T-NAT") #h(0.4em) #inf($1 : "Nat"$, $pred 1 : "Nat"$, "T-PRED")],
-  $iff isZero 0 thn 2 els pred 1 : "Nat"$, "T-IF")))
+  [#tn($0 : "Nat"$, "T-Nat") #h(0.4em) #inf($0 : "Nat"$, $isZero 0 : "Bool"$, "T-IsZero") #h(0.4em) #tn($2 : "Nat"$, "T-Nat") #h(0.4em) #inf($1 : "Nat"$, $pred 1 : "Nat"$, "T-Pred")],
+  $iff isZero 0 thn 2 els pred 1 : "Nat"$, "T-If")))
 
 *Inferenza*: è il problema opposto, data solo $E$ si cerca un $T$ (e la derivazione).
 
@@ -1050,9 +1113,16 @@ typeof(E) =
   E = isZero E1            →  se typeof(E1) = Nat allora Bool, altrimenti errore
 ```
 
-Il tipo di un'espressione dipende solo dai tipi delle sue parti: è la *composizionalità*. Per questo T-IF vuole i due rami dello *stesso* tipo $T$, che diventa il tipo di tutto l'`if`: chi usa quell'`if` deve sapere un tipo preciso. Per esempio l'argomento di $pred$ deve essere $"Nat"$ e la condizione di un `if` deve essere $"Bool"$.
+Il tipo di un'espressione dipende solo dai tipi delle sue parti: è la *composizionalità*. Per questo T-If vuole i due rami dello *stesso* tipo $T$, che diventa il tipo di tutto l'`if`: chi usa quell'`if` deve sapere un tipo preciso. Per esempio l'argomento di $pred$ deve essere $"Nat"$ e la condizione di un `if` deve essere $"Bool"$.
 
-#nota[I sistemi di tipo sono *imprecisi*: danno un'approssimazione prudente che considera tutte le esecuzioni possibili, e anche qualcuna impossibile. $iff tt thn 0 els ff$ dà sicuramente un numero, ma non ha tipo: T-IF considera anche il ramo `else`, che a runtime non verrebbe mai eseguito, e $"Nat" != "Bool"$.]
+#nota[I sistemi di tipo sono *imprecisi*: danno un'approssimazione prudente che considera tutte le esecuzioni possibili, e anche qualcuna impossibile. $iff tt thn 0 els ff$ dà sicuramente un numero, ma non ha tipo: T-If considera anche il ramo `else`, che a runtime non verrebbe mai eseguito, e $"Nat" != "Bool"$.]
+
+#esercizio(10)[Per ogni espressione: dire se è ben tipata costruendo l'albero di derivazione (e dare il tipo), oppure mostrare che l'albero non si può costruire. Poi valutarla passo per passo fino a un valore, o fino a un'espressione che non si riduce più.
+  a. $iff isZero (pred 0) thn tt els ff$ \
+  b. $iff isZero (pred tt) thn tt els ff$ \
+  c. $isZero (succ (pred 5))$ \
+  d. $pred (pred (pred 2))$ \
+  e. $iff tt thn isZero 2 els succ 1$]
 
 == Type safety
 
@@ -1068,18 +1138,26 @@ Insieme garantiscono che l'esecuzione di un'espressione ben tipata non si blocca
 
 #nota[Senza tipi può succedere che l'espressione non sia un valore e non esista nessuna regola per proseguire: $iff 0 thn 2 els 1$ resta bloccata, perché la condizione non è né $tt$ né $ff$. Il progresso dice che con i tipi non capita.]
 
-Per la conservazione, esempio sull'albero visto prima: $iff isZero 0 thn 2 els pred 1 : "Nat"$ fa un passo e diventa $iff tt thn 2 els pred 1$, che ha ancora tipo $"Nat"$ (T-TRUE, $2 : "Nat"$ e $pred 1 : "Nat"$ danno T-IF). Poi diventa $2 : "Nat"$.
+Per la conservazione, esempio sull'albero visto prima: $iff isZero 0 thn 2 els pred 1 : "Nat"$ fa un passo e diventa $iff tt thn 2 els pred 1$, che ha ancora tipo $"Nat"$ (T-True, $2 : "Nat"$ e $pred 1 : "Nat"$ danno T-If). Poi diventa $2 : "Nat"$.
 
 Le dimostrazioni sono per *induzione sulla derivazione di $E : T$*: un caso per ogni regola di tipo. Si mostra il caso dell'`if` (gli altri sono analoghi).
 
-*Progresso.* Casi base (T-TRUE, T-FALSE, T-NAT): $E$ è già un valore. Caso $E = iff E_1 thn E_2 els E_3$: per T-IF vale $E_1 : "Bool"$. Per ipotesi induttiva (a) $E_1$ è un valore, quindi $tt$ o $ff$, e scatta IF-TRUE o IF-FALSE; oppure (b) $E_1 arrow.r E_1'$, e scatta IF-COND. In ogni caso $E$ fa un passo.
+*Progresso.* Casi base (T-True, T-False, T-Nat): $E$ è già un valore. Caso $E = iff E_1 thn E_2 els E_3$: per T-If vale $E_1 : "Bool"$. Per ipotesi induttiva (a) $E_1$ è un valore, quindi $tt$ o $ff$, e scatta If-True o If-False; oppure (b) $E_1 arrow.r E_1'$, e scatta If-Cond. In ogni caso $E$ fa un passo.
 
-*Conservazione.* Casi base: $E$ è un valore, non si riduce, la tesi è vera. Caso $E = iff E_1 thn E_2 els E_3 : T$: per T-IF vale $E_1 : "Bool"$, $E_2 : T$, $E_3 : T$. Il passo $E arrow.r E'$ può venire da tre regole:
-+ IF-TRUE: $E' = E_2$, che ha tipo $T$;
-+ IF-FALSE: $E' = E_3$, che ha tipo $T$;
-+ IF-COND con $E_1 arrow.r E_1'$: per ipotesi induttiva $E_1' : "Bool"$, quindi con T-IF anche $iff E_1' thn E_2 els E_3 : T$.
+*Conservazione.* Casi base: $E$ è un valore, non si riduce, la tesi è vera. Caso $E = iff E_1 thn E_2 els E_3 : T$: per T-If vale $E_1 : "Bool"$, $E_2 : T$, $E_3 : T$. Il passo $E arrow.r E'$ può venire da tre regole:
++ If-True: $E' = E_2$, che ha tipo $T$;
++ If-False: $E' = E_3$, che ha tipo $T$;
++ If-Cond con $E_1 arrow.r E_1'$: per ipotesi induttiva $E_1' : "Bool"$, quindi con T-If anche $iff E_1' thn E_2 els E_3 : T$.
 
 = Il lambda calcolo tipato
+
+#obiettivi(
+  [usare l'ambiente dei tipi $Gamma$ e il giudizio $Gamma tack.r e : tau$],
+  [costruire l'albero di tipo di un termine di FUN con T-Var, T-Fun, T-App, T-If, o mostrare che non esiste],
+  [valutare un termine con la call-by-value, fino a un valore o a un termine bloccato],
+  [enunciare progresso, conservazione e lemma di sostituzione, e dire dove serve il lemma],
+  [spiegare perché $Omega$ e $Y$ non sono tipabili e come $fix$ recupera la ricorsione],
+)
 
 == Tipi e regole di tipo
 
@@ -1099,9 +1177,10 @@ Il linguaggio, che chiamiamo *FUN*, ha il parametro con il suo tipo (nel formato
 La semantica è quella già vista, riscritta con la nuova sintassi (sostituzione che evita la cattura). Per l'applicazione si usa *call-by-value*: prima si calcola la funzione, poi l'argomento, poi si fa la β-riduzione.
 
 #regole([Semantica], verde,
-  [$Apply(fun x : tau = e_1, v_2) arrow.r e_1 {x := v_2}$ #h(1em) #text(8pt, fill: gray)[(β-riduzione)]],
-  [#regola($e_1 arrow.r e_1'$, $Apply(e_1, e_2) arrow.r Apply(e_1', e_2)$) #h(3em) #regola($e_2 arrow.r e_2'$, $Apply(v_1, e_2) arrow.r Apply(v_1, e_2')$)],
-  [#regola($e arrow.r e'$, $iff e thn e_1 els e_2 arrow.r iff e' thn e_1 els e_2$) #h(2em) $iff tt thn e_1 els e_2 arrow.r e_1$ #h(2em) $iff ff thn e_1 els e_2 arrow.r e_2$])
+  [#ax($Apply(fun x : tau = e_1, v_2) arrow.r e_1 {x := v_2}$, "App")],
+  rg(2, inf($e_1 arrow.r e_1'$, $Apply(e_1, e_2) arrow.r Apply(e_1', e_2)$, "App-1"), inf($e_2 arrow.r e_2'$, $Apply(v_1, e_2) arrow.r Apply(v_1, e_2')$, "App-2")),
+  [#inf($e arrow.r e'$, $iff e thn e_1 els e_2 arrow.r iff e' thn e_1 els e_2$, "If-Cond")],
+  rg(2, ax($iff tt thn e_1 els e_2 arrow.r e_1$, "If-True"), ax($iff ff thn e_1 els e_2 arrow.r e_2$, "If-False")))
 
 *Il problema di tipare le funzioni.* Per dare un tipo a $fun x : tau_1 = e$ ci aspettiamo $tau_1 arrow.r tau_2$, dove $tau_2$ è il tipo del corpo $e$. Ma il tipo di $e$ dipende dal tipo di $x$, che si decide nella funzione. Serve ricordare i tipi delle variabili: l'*ambiente dei tipi* $Gamma$, una funzione che associa nomi a tipi.
 
@@ -1121,15 +1200,15 @@ $ Gamma tack.r e : tau $
 "nell'ambiente $Gamma$, l'espressione $e$ ha tipo $tau$". Nel linguaggio dei compilatori l'ambiente dei tipi è la *tabella dei simboli* (_symbol table_); le regole le applica il compilatore durante l'analisi statica.
 
 #regole([Regole di tipo di FUN], blu,
-  [#inf($$, $Gamma tack.r tt : "Bool"$, "T-TRUE") #h(2em) #inf($$, $Gamma tack.r ff : "Bool"$, "T-FALSE") #h(2em) #inf($Gamma(x) = tau$, $Gamma tack.r x : tau$, "T-VAR")],
-  [#inf($Gamma tack.r e : "Bool" quad Gamma tack.r e_1 : tau quad Gamma tack.r e_2 : tau$, $Gamma tack.r iff e thn e_1 els e_2 : tau$, "T-IF")],
-  [#inf($Gamma, x : tau_1 tack.r e : tau_2$, $Gamma tack.r fun x : tau_1 = e : tau_1 arrow.r tau_2$, "T-FUN")],
-  [#inf($Gamma tack.r e_1 : tau_1 arrow.r tau_2 quad Gamma tack.r e_2 : tau_1$, $Gamma tack.r Apply(e_1, e_2) : tau_2$, "T-APPLY")])
+  [#inf($$, $Gamma tack.r tt : "Bool"$, "T-True") #h(2em) #inf($$, $Gamma tack.r ff : "Bool"$, "T-False") #h(2em) #inf($Gamma(x) = tau$, $Gamma tack.r x : tau$, "T-Var")],
+  [#inf($Gamma tack.r e : "Bool" quad Gamma tack.r e_1 : tau quad Gamma tack.r e_2 : tau$, $Gamma tack.r iff e thn e_1 els e_2 : tau$, "T-If")],
+  [#inf($Gamma, x : tau_1 tack.r e : tau_2$, $Gamma tack.r fun x : tau_1 = e : tau_1 arrow.r tau_2$, "T-Fun")],
+  [#inf($Gamma tack.r e_1 : tau_1 arrow.r tau_2 quad Gamma tack.r e_2 : tau_1$, $Gamma tack.r Apply(e_1, e_2) : tau_2$, "T-App")])
 
-- *T-VAR*: una variabile ha il tipo che le dà l'ambiente.
-- *T-IF*: i rami hanno lo stesso tipo $tau$, che può essere anche un tipo funzione: si possono avere condizionali i cui rami sono funzioni.
-- *T-FUN*: il parametro $x$ è dichiarato con il suo tipo $tau_1$; per tipare il corpo si usa $Gamma, x : tau_1$. Questa dichiarazione *sovrascrive* eventuali dichiarazioni precedenti di $x$ e vale solo nel corpo (è il suo _scope_). Il risultato è il tipo del corpo.
-- *T-APPLY*: se $e_1$ trasforma argomenti di tipo $tau_1$ in risultati di tipo $tau_2$ e $e_2$ ha tipo $tau_1$, il risultato è di tipo $tau_2$.
+- *T-Var*: una variabile ha il tipo che le dà l'ambiente.
+- *T-If*: i rami hanno lo stesso tipo $tau$, che può essere anche un tipo funzione: si possono avere condizionali i cui rami sono funzioni.
+- *T-Fun*: il parametro $x$ è dichiarato con il suo tipo $tau_1$; per tipare il corpo si usa $Gamma, x : tau_1$. Questa dichiarazione *sovrascrive* eventuali dichiarazioni precedenti di $x$ e vale solo nel corpo (è il suo _scope_). Il risultato è il tipo del corpo.
+- *T-App*: se $e_1$ trasforma argomenti di tipo $tau_1$ in risultati di tipo $tau_2$ e $e_2$ ha tipo $tau_1$, il risultato è di tipo $tau_2$.
 
 Esempio: $emptyset tack.r fun x : "Bool" = x : "Bool" arrow.r "Bool"$, perché $emptyset, x : "Bool" tack.r x : "Bool"$.
 
@@ -1138,9 +1217,15 @@ Esempio: $emptyset tack.r fun x : "Bool" = x : "Bool" arrow.r "Bool"$, perché $
 #let B = "Bool"
 #centro(text(8pt, inf(
   inf(
-    [#inf($Gamma_f (f) = B arrow.r B$, $Gamma_f tack.r f : B arrow.r B$, "T-VAR") #h(1.2em) #inf($Gamma_f tack.r ff : B quad Gamma_f tack.r tt : B quad Gamma_f tack.r ff : B$, $Gamma_f tack.r e_0 : B$, "T-IF")],
-    $Gamma_f tack.r Apply(f, e_0) : B$, "T-APPLY"),
-  $emptyset tack.r fun f : B arrow.r B = Apply(f, e_0) : (B arrow.r B) arrow.r B$, "T-FUN")))
+    [#inf($Gamma_f (f) = B arrow.r B$, $Gamma_f tack.r f : B arrow.r B$, "T-Var") #h(1.2em) #inf($Gamma_f tack.r ff : B quad Gamma_f tack.r tt : B quad Gamma_f tack.r ff : B$, $Gamma_f tack.r e_0 : B$, "T-If")],
+    $Gamma_f tack.r Apply(f, e_0) : B$, "T-App"),
+  $emptyset tack.r fun f : B arrow.r B = Apply(f, e_0) : (B arrow.r B) arrow.r B$, "T-Fun")))
+
+#esercizio(11)[Per ogni termine: dire se è ben tipato costruendo l'albero di derivazione (e dare il tipo), oppure mostrare che l'albero non si può costruire. Poi valutarlo fino a un valore, o fino a un termine che non si riduce più.
+  a. $Apply(fun x : "Bool" = x, tt)$ \
+  b. $Apply(fun x : "Bool" = Apply(x, tt), ff)$ \
+  c. $fun f : "Bool" arrow.r "Bool" = Apply(f, tt)$ \
+  d. $Apply(fun f : "Bool" arrow.r "Bool" = (fun x : "Bool" = Apply(f, x)), fun x : "Bool" = x)$]
 
 == Type safety nel λ-calcolo tipato
 
@@ -1161,25 +1246,31 @@ Si dimostrano ancora per induzione sulle derivazioni di tipo.
 
 *Conservazione.* Il caso difficile è l'applicazione $e = Apply(fun x : tau_1 = e_3, e_2)$ con $e_2$ valore, che si riduce a $e' = e_3 {x := e_2}$. Dal tipo di $e$ si ricava $Gamma, x : tau_1 tack.r e_3 : tau_2$ e $Gamma tack.r e_2 : tau_1$, e bisogna dimostrare $Gamma tack.r e_3 {x := e_2} : tau_2$. Ma abbiamo tipato $e_3$ e non $e_3 {x := e_2}$: ci vuole un lemma che dica che la sostituzione non cambia il tipo.
 
-#nota[*Lemma di sostituzione*: se $Gamma, x : tau_1 tack.r e : tau$ e $Gamma tack.r e_1 : tau_1$ allora $Gamma tack.r e {x := e_1} : tau$. Sostituire un parametro formale con un parametro attuale dello *stesso tipo* conserva il tipo. Esempio: se $iff x thn e_1 els e_2 : "Bool"$ nell'ipotesi $x : "Bool"$, allora anche $(iff x thn e_1 els e_2) {x := tt} : "Bool"$. Si dimostra per induzione sulla derivazione di $Gamma, x : tau_1 tack.r e : tau$; i casi interessanti sono variabili e astrazioni.]
+#teorema[Lemma di sostituzione][Se $Gamma, x : tau_1 tack.r e_3 : tau_2$ e $Gamma tack.r e_2 : tau_1$, allora $Gamma tack.r e_3 {x := e_2} : tau_2$.]
+
+Sostituire il parametro formale con un parametro attuale dello *stesso tipo* conserva il tipo. Esempio: con $x : "Bool"$ vale $iff x thn ff els tt : "Bool"$, quindi anche $(iff x thn ff els tt){x := tt} = iff tt thn ff els tt : "Bool"$. Il lemma si dimostra per induzione sulla derivazione di $Gamma, x : tau_1 tack.r e_3 : tau_2$; i casi interessanti sono variabili e astrazioni. Con il lemma la conservazione è dimostrata: è proprio $Gamma tack.r e' : tau_2$.
 
 == Estensioni e ricorsione
 
 Si può estendere FUN per farlo diventare un vero linguaggio di programmazione. Con le costanti numeriche $n$ (tipo $"Nat"$) e le operazioni binarie $e_1 plus.o e_2$ (con $plus.o in {"+", "-", "*", "/", "%"}$, di tipo noto $tau_1 times tau_2 arrow.r tau$):
 
+Si calcola prima l'operando sinistro, poi il destro, poi si fa l'operazione ($delta_plus.o$ è l'operazione vera, per esempio la somma):
+
+#centro([#inf($e_1 arrow.r e_1'$, $e_1 plus.o e_2 arrow.r e_1' plus.o e_2$, "Op-1") #h(2em) #inf($e_2 arrow.r e_2'$, $n_1 plus.o e_2 arrow.r n_1 plus.o e_2'$, "Op-2") #h(2em) #inf($delta_plus.o (n_1, n_2) = n$, $n_1 plus.o n_2 arrow.r n$, "Op-3")])
+
 #centro(grid(columns: 2, gutter: 3em, align: bottom,
-  inf($$, $Gamma tack.r n : "Nat"$, "T-NUM"),
-  inf($Gamma tack.r e_1 : tau_1 quad Gamma tack.r e_2 : tau_2 quad plus.o : tau_1 times tau_2 arrow.r tau$, $Gamma tack.r e_1 plus.o e_2 : tau$, "T-OP")))
+  inf($$, $Gamma tack.r n : "Nat"$, "T-Nat"),
+  inf($Gamma tack.r e_1 : tau_1 quad Gamma tack.r e_2 : tau_2 quad plus.o : tau_1 times tau_2 arrow.r tau$, $Gamma tack.r e_1 plus.o e_2 : tau$, "T-Op")))
 
 Si aggiungono anche le *dichiarazioni locali* $"let" x = e_1 "in" e_2$. Si calcola prima $e_1$; quando è un valore $v$ lo si sostituisce a $x$ in $e_2$. Il tipo di $x$ è quello di $e_1$, e vale solo in $e_2$:
 
 #regole([Dichiarazioni locali], verde,
-  [#regola($e_1 arrow.r e_1'$, $lett x = e_1 inn e_2 arrow.r lett x = e_1' inn e_2$) #h(3em) $lett x = v inn e_2 arrow.r e_2 {x := v}$],
-  [#inf($Gamma tack.r e_1 : tau_1 quad Gamma, x : tau_1 tack.r e_2 : tau_2$, $Gamma tack.r lett x = e_1 inn e_2 : tau_2$, "T-LET")])
+  [#inf($e_1 arrow.r e_1'$, $lett x = e_1 inn e_2 arrow.r lett x = e_1' inn e_2$, "Let-1") #h(3em) #ax($lett x = v inn e_2 arrow.r e_2 {x := v}$, "Let-2")],
+  [#inf($Gamma tack.r e_1 : tau_1 quad Gamma, x : tau_1 tack.r e_2 : tau_2$, $Gamma tack.r lett x = e_1 inn e_2 : tau_2$, "T-Let")])
 
 *Ricorsione.* Nel λ-calcolo tipato semplice tutti i programmi tipabili *terminano*. Quindi $Omega = (lambda x. x x)(lambda x. x x)$ e il combinatore $Y$ *non sono tipabili*. Il motivo è l'auto-applicazione $x x$:
 
-#centro(inf($Gamma tack.r x : tau_1 arrow.r tau_2 quad Gamma tack.r x : tau_1$, $Gamma tack.r Apply(x, x) : tau_2$, "T-APPLY"))
+#centro(inf($Gamma tack.r x : tau_1 arrow.r tau_2 quad Gamma tack.r x : tau_1$, $Gamma tack.r Apply(x, x) : tau_2$, "T-App"))
 
 $x$ ha un solo tipo, quindi servirebbe $tau_1 = tau_1 arrow.r tau_2$, che è impossibile. Per avere la ricorsione bisogna aggiungere al linguaggio un costrutto apposta, tipabile e con le proprietà che vogliamo.
 
@@ -1191,8 +1282,8 @@ $ G : ("Nat" arrow.r "Nat") arrow.r "Nat" arrow.r "Nat" $
 Il costrutto $fix e$ calcola questo punto fisso, e si scrive $"fact" = fix G$.
 
 #regole([Il costrutto fix], blu,
-  [#regola($e arrow.r e'$, $fix e arrow.r fix e'$) #h(3em) $fix (fun f : tau = e) arrow.r e {f := fix (fun f : tau = e)}$],
-  [#inf($Gamma tack.r e : tau arrow.r tau$, $Gamma tack.r fix e : tau$, "T-FIX")])
+  [#inf($e arrow.r e'$, $fix e arrow.r fix e'$, "Fix") #h(3em) #ax($fix (fun f : tau = e) arrow.r e {f := fix (fun f : tau = e)}$, "FixFun")],
+  [#inf($Gamma tack.r e : tau arrow.r tau$, $Gamma tack.r fix e : tau$, "T-Fix")])
 
 La regola di valutazione "srotola" una volta la ricorsione: il corpo $e$ viene eseguito con $f$ sostituita da $fix$ di sé stesso, così alla prossima chiamata ricorsiva si srotola ancora. Per $"fact" 3 = (fix G) 3$:
 
@@ -1234,3 +1325,187 @@ Si esce dal problema *approssimando*: al posto della proprietà esatta se ne con
 Il punto rosso sta fuori da tutto: $succ tt$ si blocca, e il type checker lo rifiuta giustamente. $iff tt thn 0 els ff$ invece non dà errori, ma viene rifiutato lo stesso.
 
 Su questa idea sono costruiti gli *analizzatori statici* usati nell'industria, che controllano il codice senza eseguirlo: per esempio Infer, FlowDroid e Roslyn Code Analyzer.
+
+#set heading(numbering: none)
+
+= Riepilogo delle regole
+
+Tutte le definizioni in un posto solo, per ripassare. Il nome di ogni regola è quello che si scrive negli alberi.
+
+#text(9.5pt)[
+#regole([λ-calcolo: sintassi, variabili libere, sostituzione], blu,
+  rg(4, $e ::= x | lambda x. e | e e$, $"FV"(x) = {x}$, $"FV"(e_1 e_2) = "FV"(e_1) union "FV"(e_2)$, $"FV"(lambda x. e) = "FV"(e) without {x}$),
+  rg(3, $x {x := e} = e$, [$y {x := e} = y$ se $y != x$], $(e_1 e_2){x := e} = (e_1 {x := e})(e_2 {x := e})$),
+  rg(2, $(lambda x. e_1){x := e} = lambda x. e_1$, [$(lambda y. e_1){x := e} = lambda y. (e_1 {x := e})$ se $y != x$, $y in.not "FV"(e)$]),
+  [$(lambda y. e_1){x := e} = lambda z. ((e_1 {y := z}){x := e})$ se $y != x$, $y in "FV"(e)$, $z$ fresca])
+
+#regole([Riduzione standard, call-by-value, call-by-name], red,
+  rg(2, ax($(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$, "App"), inf($e arrow.r e'$, $lambda x. e arrow.r lambda x. e'$, "App-Body")), rg(2, inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "App-1"), inf($e_2 arrow.r e'$, $e_1 e_2 arrow.r e_1 e'$, "App-2")),
+  rg(3, ax($(lambda x. e_1) v_2 arrow.r e_1 {x := v_2}$, "CV-App"), inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "CV-App-1"), inf($e_2 arrow.r e'$, $v_1 e_2 arrow.r v_1 e'$, "CV-App-2")),
+  rg(2, ax($(lambda x. e_1) e_2 arrow.r e_1 {x := e_2}$, "CN-App"), inf($e_1 arrow.r e'$, $e_1 e_2 arrow.r e' e_2$, "CN-App-1")))
+
+#regole([Codifiche], verde,
+  rg(3, $TRUE = lambda t. lambda f. t$, $FALSE = lambda t. lambda f. f$, $NOT = lambda b. b FALSE TRUE$),
+  rg(2, $AND = lambda b. lambda c. b c FALSE$, $OR = lambda b. lambda c. b TRUE c$),
+  rg(3, $IF = lambda c. lambda "then". lambda "else". c "then" "else"$, $C_n = lambda s. lambda z. s^n z$, $SUCC = lambda n. lambda s. lambda z. s (n s z)$),
+  rg(3, $PLUS = lambda m. lambda n. lambda s. lambda z. m s (n s z)$, $TIMES = lambda m. lambda n. m (PLUS n) C_0$, $Y = lambda f. (lambda x. f (x x))(lambda x. f (x x))$))
+
+#regole([Linguaggio di espressioni], blu,
+  rg(3, $E ::= tt | ff | n | iff E thn E els E | succ E | pred E | isZero E$, $V ::= tt | ff | n$, $T ::= "Bool" | "Nat"$),
+  rg(2, ax($iff tt thn E_1 els E_2 arrow.r E_1$, "If-True"), ax($iff ff thn E_1 els E_2 arrow.r E_2$, "If-False")),
+  inf($E arrow.r E'$, $iff E thn E_1 els E_2 arrow.r iff E' thn E_1 els E_2$, "If-Cond"),
+  rg(3, inf($E arrow.r E'$, $succ E arrow.r succ E'$, "Succ"), inf($m = n + 1$, $succ n arrow.r m$, "SuccNat"), ax($pred 0 arrow.r 0$, "PredZero")),
+  rg(2, inf($E arrow.r E'$, $pred E arrow.r pred E'$, "Pred"), inf($n > 0 quad m = n - 1$, $pred n arrow.r m$, "PredNat")),
+  rg(3, inf($E arrow.r E'$, $isZero E arrow.r isZero E'$, "IsZero"), ax($isZero 0 arrow.r tt$, "IsZeroZero"), inf($n > 0$, $isZero n arrow.r ff$, "IsZeroSucc")),
+  rg(4, ax($tt : "Bool"$, "T-True"), ax($ff : "Bool"$, "T-False"), ax($n : "Nat"$, "T-Nat"), inf($E : "Bool" quad E_1 : T quad E_2 : T$, $iff E thn E_1 els E_2 : T$, "T-If")),
+  rg(3, inf($E : "Nat"$, $succ E : "Nat"$, "T-Succ"), inf($E : "Nat"$, $pred E : "Nat"$, "T-Pred"), inf($E : "Nat"$, $isZero E : "Bool"$, "T-IsZero")))
+
+#regole([λ-calcolo tipato (FUN) ed estensioni], verde,
+  [$e ::= x | fun x : tau = e | Apply(e, e) | tt | ff | iff e thn e els e | n | e plus.o e | lett x = e inn e | fix e$],
+  rg(2, $v ::= fun x : tau = e | tt | ff | n$, $tau ::= "Bool" | "Nat" | tau arrow.r tau$),
+  ax($Apply(fun x : tau = e_1, v_2) arrow.r e_1 {x := v_2}$, "App"), rg(2, inf($e_1 arrow.r e_1'$, $Apply(e_1, e_2) arrow.r Apply(e_1', e_2)$, "App-1"), inf($e_2 arrow.r e_2'$, $Apply(v_1, e_2) arrow.r Apply(v_1, e_2')$, "App-2")),
+  [If-True, If-False, If-Cond come nel linguaggio di espressioni],
+  rg(3, inf($e_1 arrow.r e_1'$, $e_1 plus.o e_2 arrow.r e_1' plus.o e_2$, "Op-1"), inf($e_2 arrow.r e_2'$, $n_1 plus.o e_2 arrow.r n_1 plus.o e_2'$, "Op-2"), inf($delta_plus.o (n_1, n_2) = n$, $n_1 plus.o n_2 arrow.r n$, "Op-3")),
+  rg(2, inf($e_1 arrow.r e_1'$, $lett x = e_1 inn e_2 arrow.r lett x = e_1' inn e_2$, "Let-1"), ax($lett x = v inn e_2 arrow.r e_2 {x := v}$, "Let-2")),
+  rg(2, inf($e arrow.r e'$, $fix e arrow.r fix e'$, "Fix"), ax($fix (fun f : tau = e) arrow.r e {f := fix (fun f : tau = e)}$, "FixFun")),
+  rg(4, ax($Gamma tack.r tt : "Bool"$, "T-True"), ax($Gamma tack.r ff : "Bool"$, "T-False"), ax($Gamma tack.r n : "Nat"$, "T-Nat"), inf($Gamma(x) = tau$, $Gamma tack.r x : tau$, "T-Var")),
+  rg(2, inf($Gamma, x : tau_1 tack.r e : tau_2$, $Gamma tack.r fun x : tau_1 = e : tau_1 arrow.r tau_2$, "T-Fun"), inf($Gamma tack.r e_1 : tau_1 arrow.r tau_2 quad Gamma tack.r e_2 : tau_1$, $Gamma tack.r Apply(e_1, e_2) : tau_2$, "T-App")),
+  rg(2, inf($Gamma tack.r e : "Bool" quad Gamma tack.r e_1 : tau quad Gamma tack.r e_2 : tau$, $Gamma tack.r iff e thn e_1 els e_2 : tau$, "T-If"), inf($Gamma tack.r e_1 : tau_1 quad Gamma tack.r e_2 : tau_2 quad plus.o : tau_1 times tau_2 arrow.r tau$, $Gamma tack.r e_1 plus.o e_2 : tau$, "T-Op")),
+  rg(2, inf($Gamma tack.r e_1 : tau_1 quad Gamma, x : tau_1 tack.r e_2 : tau_2$, $Gamma tack.r lett x = e_1 inn e_2 : tau_2$, "T-Let"), inf($Gamma tack.r e : tau arrow.r tau$, $Gamma tack.r fix e : tau$, "T-Fix")))
+
+#regole([Proprietà], red,
+  [*Church-Rosser*: se $e arrow.r.double e_1$ e $e arrow.r.double e_2$ esiste $e'$ con $e_1 arrow.r.double e'$ e $e_2 arrow.r.double e'$],
+  [*Progresso*: se $emptyset tack.r e : tau$ allora $e$ è un valore oppure $e arrow.r e'$],
+  [*Conservazione*: se $Gamma tack.r e : tau$ e $e arrow.r e'$ allora $Gamma tack.r e' : tau$],
+  [*Lemma di sostituzione*: se $Gamma, x : tau_1 tack.r e_3 : tau_2$ e $Gamma tack.r e_2 : tau_1$ allora $Gamma tack.r e_3 {x := e_2} : tau_2$])
+]
+
+= Soluzioni degli esercizi
+
+#let B = "Bool"
+#let N = "Nat"
+
+#soluzione(1)[
+  a. Con le parentesi: $(((lambda x. x)(lambda y. x x))(lambda y. y)) y$. In $lambda y. x x$ il $lambda$ lega solo $y$, quindi le due $x$ sono *libere*; anche l'ultima $y$ è libera, perché sta fuori da ogni $lambda y$. $"FV" = {x, y}$.
+
+  b. $(lambda x. x k)((lambda x. lambda y. x y)(lambda z. ((lambda x. z) y)))$. Libere: la $k$ di $lambda x. x k$ e la $y$ alla fine ($lambda z$ lega $z$, $lambda x$ non lega $y$). $"FV" = {k, y}$.
+
+  c. $(x (lambda x. ((lambda y. y y) x))) y$: la parentesi chiude il corpo di $lambda x$. Libere la *prima* $x$ (fuori dal $lambda x$) e l'ultima $y$; la $x$ dentro il corpo è legata. $"FV" = {x, y}$: la stessa lettera $x$ è libera in un punto e legata in un altro.
+]
+
+#soluzione(2)[
+  a. $y in "FV"(y)$: la $y$ che entra verrebbe catturata da $lambda y$. Rinomino: $(lambda y. x y){x := y} attach(equiv, br: alpha) (lambda z. x z){x := y} = lambda z. y z$.
+
+  b. $"FV"(lambda y. y) = emptyset$: nessuna cattura, $(lambda y. x y){x := lambda y. y} = lambda y. (lambda y. y) y$.
+
+  c. $"FV"(lambda x. x y) = {y}$: la $y$ verrebbe catturata. Rinomino: $lambda z. (lambda x. x y) z$.
+]
+
+#soluzione(3)[
+  Un redex è una sottoespressione della forma $(lambda x. e_1) e_2$: a sinistra deve esserci proprio un $lambda$.
+
+  a. Tre: tutta l'espressione; $(lambda x. x)(lambda z. (lambda x. x) z)$; $(lambda x. x) z$.
+
+  b. Uno: $(lambda x. x)(lambda x. x x)$. Tutta l'espressione è $((lambda x. x)(lambda x. x x))(lambda y. y)$: a sinistra c'è un'applicazione, non un $lambda$, quindi non è un redex (lo diventa dopo un passo). $x x$ non è un redex: $x$ non è un $lambda$.
+
+  c. Due: $(lambda x. (lambda y. y y) x) y$ e $(lambda y. y y) x$. $x (dots)$ non è un redex.
+]
+
+#soluzione(4)[
+  a. Tutte e due arrivano a $z$ (terzo caso della definizione): $(lambda x. x)(lambda y. y) z arrow.r (lambda y. y) z arrow.r z$ e $(lambda x. lambda k. k) w z arrow.r (lambda k. k) z arrow.r z$.
+
+  b. $(lambda x. x)(lambda y. y) arrow.r lambda y. y$ e $(lambda y. y)(lambda x. x) arrow.r lambda x. x$, e $lambda y. y attach(equiv, br: alpha) lambda x. x$: un passo per parte.
+
+  c. A sinistra la $y$ dell'argomento verrebbe catturata, quindi rinomino: $(lambda x. lambda y. x y) y arrow.r lambda z. y z$. A destra la $x$ del corpo è legata dal $lambda x$ interno, quindi la sostituzione $\{x := k\}$ non cambia niente: $(lambda x. (lambda x. x)(lambda z. y z)) k arrow.r (lambda x. x)(lambda z. y z) arrow.r lambda z. y z$. Stesso termine.
+]
+
+#soluzione(5)[
+  a. Un solo redex, $(lambda x. lambda y. x y)(lambda z. z y)$. Sostituendo, la $y$ di $lambda z. z y$ verrebbe catturata da $lambda y$: rinomino in $a$. Poi ci sono due redex, e tutte e due le strade arrivano a $y y$:
+  $ (lambda x. lambda y. x y)(lambda z. z y) y arrow.r (lambda a. (lambda z. z y) a) y #h(1em) cases(arrow.r (lambda z. z y) y arrow.r y y & "(prima l'esterno)", arrow.r (lambda a. a y) y arrow.r y y & "(prima l'interno " (lambda z. z y) a ")") $
+
+  b. Stessa forma: la $y$ di $lambda x. y y$ va protetta. $(lambda x. lambda y. x y)(lambda x. y y) k arrow.r (lambda a. (lambda x. y y) a) k$, poi $arrow.r (lambda x. y y) k arrow.r y y$ oppure $arrow.r (lambda a. y y) k arrow.r y y$. Forma normale $y y$.
+
+  c. Due redex: tutta l'espressione e $(lambda y. x y)(lambda k. k)$.
+  - Prima l'esterno: sostituisco $x := x y$ in $(lambda y. x y)(lambda k. k)$; la $y$ di $x y$ verrebbe catturata, rinomino: $(lambda a. x y a)(lambda k. k) arrow.r x y (lambda k. k)$.
+  - Prima l'interno: $(lambda y. x y)(lambda k. k) arrow.r x (lambda k. k)$, poi $(lambda x. x (lambda k. k))(x y) arrow.r x y (lambda k. k)$.
+  Forma normale $x y (lambda k. k)$, cioè $(x y)(lambda k. k)$.
+
+  d. Scegliendo il redex esterno: $(lambda x. y)(dots) arrow.r y$, forma normale. Scegliendo sempre quello interno non si finisce mai, perché il termine cresce: $(lambda y. y y y)(lambda x. x x x) arrow.r (lambda x. x x x)(lambda x. x x x)(lambda x. x x x) arrow.r dots$ (ogni passo aggiunge una copia). È lo stesso caso di $(lambda x. y) Omega$.
+
+  e. Ogni strada arriva a $(lambda z. z z)(lambda z. z z)$, che è $Omega$: non c'è forma normale. Per esempio prima l'esterno:
+  $ & (lambda z. ((lambda x. lambda y. x y) z) z)(lambda z. z z) arrow.r ((lambda x. lambda y. x y)(lambda z. z z))(lambda z. z z) \ & arrow.r (lambda y. (lambda z. z z) y)(lambda z. z z) arrow.r (lambda z. z z)(lambda z. z z) arrow.r (lambda z. z z)(lambda z. z z) arrow.r dots $
+  Prima l'interno: $(lambda x. lambda y. x y) z arrow.r lambda y. z y$, poi $(lambda y. z y) z arrow.r z z$, e si arriva a $(lambda z. z z)(lambda z. z z)$ lo stesso.
+]
+
+#soluzione(6)[
+  Le due strategie non riducono mai dentro il corpo di una funzione, quindi le strade "prima l'interno" dell'esercizio 5 non ci sono.
+
+  a, b. CBV e CBN fanno gli stessi passi: la parte funzione si riduce a $lambda a. dots$, poi la β-riduzione con argomento $y$ (o $k$), che è già un valore. Risultato $y y$.
+
+  c. CBN applica subito la β-riduzione; anche la CBV, perché l'argomento $x y$ non si riduce ($x$ non è un $lambda$), quindi è già un valore. In tutte e due: $arrow.r (lambda a. x y a)(lambda k. k) arrow.r x y (lambda k. k)$.
+
+  d. *CBN*: $arrow.r y$. *CBV*: deve prima valutare l'argomento $(lambda y. y y y)(lambda x. x x x)$, che cresce all'infinito: *non termina*. È l'esempio di una CBN che termina dove la CBV no.
+
+  e. L'argomento $lambda z. z z$ è un valore, quindi le due strategie fanno gli stessi passi della strada "prima l'esterno": arrivano a $(lambda z. z z)(lambda z. z z)$ e *non terminano*.
+]
+
+#soluzione(7)[
+  $ IF FALSE e_1 e_2 &= (lambda c. lambda "then". lambda "else". c "then" "else") FALSE e_1 e_2 arrow.r (lambda "then". lambda "else". FALSE "then" "else") e_1 e_2 \
+  &arrow.r (lambda "else". FALSE e_1 "else") e_2 arrow.r FALSE e_1 e_2 = (lambda t. lambda f. f) e_1 e_2 arrow.r (lambda f. f) e_2 arrow.r e_2 $
+]
+
+#soluzione(8)[
+  $C_n s z$ applica $s$ a $z$ per $n$ volte. Se $z = TRUE$ e $s$ è la funzione che restituisce sempre $FALSE$, il risultato è $TRUE$ solo se $s$ non viene mai applicata, cioè se $n = 0$:
+  $ ISZERO = lambda n. n (lambda x. FALSE) TRUE $
+  $ ISZERO C_1 arrow.r C_1 (lambda x. FALSE) TRUE = (lambda s. lambda z. s z)(lambda x. FALSE) TRUE arrow.r (lambda z. (lambda x. FALSE) z) TRUE arrow.r (lambda x. FALSE) TRUE arrow.r FALSE $
+  Controllo con $C_0$: $ISZERO C_0 arrow.r C_0 (lambda x. FALSE) TRUE = (lambda s. lambda z. z)(lambda x. FALSE) TRUE arrow.r (lambda z. z) TRUE arrow.r TRUE$.
+]
+
+#soluzione(9)[
+  Serve un fatto che si usa sempre: $C_n s w arrow.r.double s^n w$ (due passi: prima $s$, poi $w$ al posto di $z$).
+
+  a. $PLUS C_1 C_1 arrow.r.double lambda s. lambda z. C_1 s (C_1 s z) arrow.r.double lambda s. lambda z. C_1 s (s z) arrow.r.double lambda s. lambda z. s (s z) = C_2$ (le ultime riduzioni sono dentro il corpo, con la riduzione standard).
+
+  b. Dentro: $IF FALSE TRUE FALSE arrow.r.double FALSE$ (esercizio 7 con $e_1 = TRUE$, $e_2 = FALSE$). Quindi $IF (IF FALSE TRUE FALSE) C_1 C_2 arrow.r.double IF FALSE C_1 C_2 arrow.r.double C_2$.
+
+  c. $PLUS C_2 C_1 arrow.r.double lambda s. lambda z. C_2 s (C_1 s z) arrow.r.double lambda s. lambda z. C_2 s (s z) arrow.r.double lambda s. lambda z. s (s (s z)) = C_3$.
+
+  d. $TIMES C_2 C_2 arrow.r.double C_2 (PLUS C_2) C_0 arrow.r.double PLUS C_2 (PLUS C_2 C_0)$ ($C_2$ applica $PLUS C_2$ due volte a $C_0$). Dentro: $PLUS C_2 C_0 arrow.r.double lambda s. lambda z. C_2 s (C_0 s z) arrow.r.double lambda s. lambda z. C_2 s z arrow.r.double C_2$. Quindi
+  $ PLUS C_2 C_2 arrow.r.double lambda s. lambda z. C_2 s (C_2 s z) arrow.r.double lambda s. lambda z. C_2 s (s (s z)) arrow.r.double lambda s. lambda z. s (s (s (s z))) = C_4 $
+]
+
+#soluzione(10)[
+  a. *Ben tipata*, tipo $"Bool"$:
+  #centro(text(9pt, inf([#inf(inf(ax($0 : N$, "T-Nat"), $pred 0 : N$, "T-Pred"), $isZero (pred 0) : B$, "T-IsZero") #h(1em) #ax($tt : B$, "T-True") #h(1em) #ax($ff : B$, "T-False")], $iff isZero (pred 0) thn tt els ff : B$, "T-If")))
+  Valutazione. Il primo passo è un albero anch'esso: $pred 0$ fa un passo, quindi lo fa $isZero (pred 0)$, quindi tutto l'if.
+  #centro(text(9pt, inf(inf(ax($pred 0 arrow.r 0$, "PredZero"), $isZero (pred 0) arrow.r isZero 0$, "IsZero"), $iff isZero (pred 0) thn tt els ff arrow.r iff isZero 0 thn tt els ff$, "If-Cond")))
+  Poi $arrow.r iff tt thn tt els ff$ (IsZeroZero dentro If-Cond) $arrow.r tt$ (If-True).
+
+  b. *Non tipabile*: T-Pred vuole $tt : "Nat"$, ma per $tt$ c'è solo T-True, che dà $"Bool"$. L'albero si ferma lì. Valutazione: nessuna regola si applica ($pred tt$ non è $pred n$ e $tt$ non fa passi), quindi l'espressione *è bloccata subito* senza essere un valore: è proprio quello che il progresso esclude per le espressioni ben tipate.
+
+  c. *Ben tipata*, $"Bool"$: T-Nat ($5 : N$), T-Pred, T-Succ, T-IsZero. Valutazione: $isZero (succ (pred 5)) arrow.r isZero (succ 4)$ (PredNat dentro Succ dentro IsZero) $arrow.r isZero 5$ (SuccNat dentro IsZero) $arrow.r ff$ (IsZeroSucc).
+
+  d. *Ben tipata*, $"Nat"$: T-Nat e tre volte T-Pred. Valutazione: $pred (pred (pred 2)) arrow.r pred (pred 1) arrow.r pred 0 arrow.r 0$ (PredNat due volte, poi PredZero).
+
+  e. *Non tipabile*: T-If vuole i due rami dello stesso tipo, ma $isZero 2 : "Bool"$ e $succ 1 : "Nat"$. Valutazione: $arrow.r isZero 2$ (If-True) $arrow.r ff$ (IsZeroSucc). Arriva a un valore anche se non è tipabile: come $iff tt thn 0 els ff$, il sistema di tipi scarta un'espressione che non darebbe errori.
+]
+
+#soluzione(11)[
+  a. *Ben tipato*, $"Bool"$:
+  #centro(text(9pt, inf([#inf(inf($$, $x : B tack.r x : B$, "T-Var"), $emptyset tack.r fun x : B = x : B arrow.r B$, "T-Fun") #h(1em) #ax($emptyset tack.r tt : B$, "T-True")], $emptyset tack.r Apply(fun x : B = x, tt) : B$, "T-App")))
+  Valutazione: $tt$ è un valore, quindi $arrow.r x {x := tt} = tt$ (App).
+
+  b. *Non tipabile*. Per T-Fun bisogna tipare il corpo con $x : "Bool"$, cioè $x : B tack.r Apply(x, tt)$. T-App vuole che $x$ abbia un tipo funzione $tau_1 arrow.r tau_2$, ma $Gamma(x) = "Bool"$. Valutazione: $ff$ è un valore, quindi $arrow.r Apply(x, tt){x := ff} = Apply(ff, tt)$, e qui è *bloccato*: non si applica App ($ff$ non è una funzione) né App-1 o App-2 ($ff$ e $tt$ non fanno passi).
+
+  c. *Ben tipato*, $(B arrow.r B) arrow.r B$. Con $Gamma = f : B arrow.r B$:
+  #centro(text(9pt, inf(inf([#inf($Gamma(f) = B arrow.r B$, $Gamma tack.r f : B arrow.r B$, "T-Var") #h(1em) #ax($Gamma tack.r tt : B$, "T-True")], $Gamma tack.r Apply(f, tt) : B$, "T-App"), $emptyset tack.r fun f : B arrow.r B = Apply(f, tt) : (B arrow.r B) arrow.r B$, "T-Fun")))
+  Valutazione: è una funzione, quindi è già un valore. Zero passi.
+
+  d. *Ben tipato*, $B arrow.r B$. Con $Gamma = f : B arrow.r B, x : B$, prima la funzione (chiamo $(star)$ la sua derivazione):
+  #centro(text(9pt, inf(inf(inf([#inf($$, $Gamma tack.r f : B arrow.r B$, "T-Var") #h(1em) #inf($$, $Gamma tack.r x : B$, "T-Var")], $Gamma tack.r Apply(f, x) : B$, "T-App"), $f : B arrow.r B tack.r fun x : B = Apply(f, x) : B arrow.r B$, "T-Fun"), $emptyset tack.r fun f : B arrow.r B = (fun x : B = Apply(f, x)) : (B arrow.r B) arrow.r (B arrow.r B)$, "T-Fun")))
+  Poi l'applicazione: il tipo dell'argomento, $B arrow.r B$, è proprio quello che la funzione vuole.
+  #centro(text(9pt, inf([$(star)$ #h(1em) #inf(inf($$, $x : B tack.r x : B$, "T-Var"), $emptyset tack.r fun x : B = x : B arrow.r B$, "T-Fun")], $emptyset tack.r Apply(dots, fun x : B = x) : B arrow.r B$, "T-App")))
+  Valutazione: l'argomento è un valore, quindi un passo di App:
+  $ arrow.r (fun x : B = Apply(f, x)){f := fun x : B = x} = fun x : B = Apply(fun x : B = x, x) $
+  Nessuna cattura: $fun x : B = x$ non ha variabili libere. Il risultato è una funzione, quindi un valore, e ha ancora tipo $B arrow.r B$ (conservazione).
+]
