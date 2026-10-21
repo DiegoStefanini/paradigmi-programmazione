@@ -27,6 +27,6 @@ Capitoli della dispensa: 1 «Il lambda calcolo» (sintassi, strategie CBV/CBN, c
 
 Nota: nel PDF λ è un glifo che `pdftotext` rende come "l": nella dispensa scrivere sempre λ (`$lambda$`).
 
-Fin dove si è arrivati: λ-calcolo chiuso, e OCaml fino alla fine di `Liste e Pattern Matching.pdf` (fold e modulo `List`). Esercizi 1-11 dai fogli λ, 12-18 dal foglio OCaml, tutti risolti nell'appendice «Soluzioni»; il «Riepilogo» ha anche le tabelle dei costrutti OCaml e delle funzioni su liste.
+Fin dove si è arrivati: λ-calcolo chiuso, e OCaml fino alla fine di `Liste e Pattern Matching.pdf` (fold e modulo `List`). Esercizi 1-11 dai fogli λ, 12-18 dal foglio OCaml, solo consegne; il «Riepilogo» ha anche le tabelle dei costrutti OCaml e delle funzioni su liste.
 
-Nomi delle regole: quelli dell'Appendice B della dispensa della prof (App, CV-App, If-Cond, T-App, T-Fun…). Esercizi: `#esercizio(n)[…]` nel testo, `#soluzione(n)[…]` in fondo, stesso numero. Le riduzioni si verificano con `python3 -I esercizi/lambda.py "<termine>" no|cbv|cbn` (in CBV è valore tutto ciò che non si riduce, anche una variabile libera). Il codice OCaml si prova con `podman run --rm -i docker.io/ocaml/opam:debian-12-ocaml-5.2 ocaml`.
+Nomi delle regole: quelli dell'Appendice B della dispensa della prof (App, CV-App, If-Cond, T-App, T-Fun…). Esercizi: `#esercizio(n)[…]` nel testo, senza soluzioni (Diego li fa sul quaderno). Le riduzioni si verificano con `python3 -I esercizi/lambda.py "<termine>" no|cbv|cbn` (in CBV è valore tutto ciò che non si riduce, anche una variabile libera). Il codice OCaml si prova con `podman run --rm -i docker.io/ocaml/opam:debian-12-ocaml-5.2 ocaml`.
